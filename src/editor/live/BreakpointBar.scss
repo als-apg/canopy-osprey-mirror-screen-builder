@@ -1,0 +1,79 @@
+.breakpoint-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  background-color: var(--cds-layer-01);
+  border-bottom: 1px solid var(--cds-border-subtle);
+  min-height: 36px;
+  flex-shrink: 0;
+}
+
+.breakpoint-bar__label {
+  font-size: 0.75rem;
+  color: var(--cds-text-secondary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.breakpoint-bar__buttons {
+  display: flex;
+  gap: 2px;
+}
+
+.breakpoint-bar__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  background: none;
+  color: var(--cds-icon-secondary);
+  cursor: pointer;
+  transition:
+    background-color 0.1s,
+    color 0.1s;
+
+  &:hover {
+    background-color: var(--cds-layer-hover-01);
+    color: var(--cds-icon-primary);
+  }
+
+  &--active {
+    background-color: var(--cds-layer-selected-01, var(--cds-layer-accent-01));
+    color: var(--cds-text-on-color);
+    border-color: var(--pydm-selection);
+  }
+}
+
+.breakpoint-bar__size {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.breakpoint-bar__width-input {
+  width: 60px;
+  height: 24px;
+  background: var(--cds-field-01);
+  border: 1px solid var(--cds-border-subtle);
+  border-radius: 2px;
+  color: var(--cds-text-primary);
+  font-size: 0.75rem;
+  font-family: 'IBM Plex Mono', monospace;
+  text-align: center;
+  padding: 0 4px;
+
+  &:focus {
+    outline: 2px solid var(--pydm-selection);
+    outline-offset: -2px;
+  }
+}
+
+.breakpoint-bar__px {
+  font-size: 0.6875rem;
+  color: var(--cds-text-secondary);
+}

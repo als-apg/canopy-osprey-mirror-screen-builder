@@ -1,0 +1,66 @@
+.toolbar {
+  position: fixed;
+  top: 48px; // Below Carbon header
+  left: 0;
+  right: 0;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 0 0.5rem;
+  background-color: var(--cds-layer-01);
+  border-bottom: 1px solid var(--cds-border-subtle);
+  z-index: 100;
+  gap: 2px;
+}
+
+.toolbar__section {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.toolbar__divider {
+  width: 1px;
+  height: 24px;
+  background-color: var(--cds-border-subtle);
+  margin: 0 4px;
+}
+
+.toolbar__spacer {
+  flex: 1;
+}
+
+.toolbar__zoom-label {
+  font-size: 0.75rem;
+  color: var(--cds-text-secondary);
+  min-width: 40px;
+  text-align: center;
+  user-select: none;
+}
+
+.toolbar__grid-size {
+  width: 42px;
+  height: 24px;
+  background: var(--cds-field-01);
+  border: 1px solid var(--cds-border-subtle);
+  border-radius: 2px;
+  color: var(--cds-text-primary);
+  font-size: 0.6875rem;
+  font-family: 'IBM Plex Mono', monospace;
+  text-align: center;
+  padding: 0 2px;
+  margin-left: 2px;
+
+  &:focus {
+    outline: 2px solid var(--pydm-selection);
+    outline-offset: -2px;
+  }
+}
+
+.toolbar__dirty-indicator {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--cds-support-info);
+}

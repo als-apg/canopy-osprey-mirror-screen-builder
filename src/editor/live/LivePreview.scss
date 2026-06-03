@@ -1,0 +1,77 @@
+.live-preview {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.live-preview__macro-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  background-color: var(--cds-layer-01);
+  border-bottom: 1px solid var(--cds-border-subtle);
+  min-height: 36px;
+  flex-shrink: 0;
+  overflow-x: auto;
+}
+
+.live-preview__macro-label {
+  font-size: 0.75rem;
+  color: var(--cds-text-secondary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.live-preview__macro-field {
+  min-width: 100px;
+  max-width: 150px;
+}
+
+.live-preview__macro-none {
+  font-size: 0.75rem;
+  color: var(--cds-text-secondary);
+  font-style: italic;
+}
+
+.live-preview__viewport {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 20px;
+  background-color: var(--pydm-canvas-bg);
+}
+
+.live-preview__device-frame {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+
+  &--active {
+    border: 1px solid var(--cds-border-subtle);
+    border-radius: 8px;
+    background-color: #0d0d0d;
+    padding: 0 0 8px;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  }
+}
+
+.live-preview__device-label {
+  width: 100%;
+  text-align: center;
+  padding: 4px 0;
+  font-size: 0.625rem;
+  color: var(--cds-text-secondary);
+  background-color: #1a1a1a;
+  border-bottom: 1px solid var(--cds-border-subtle);
+  font-family: 'IBM Plex Mono', monospace;
+  letter-spacing: 0.5px;
+}
+
+.live-preview__screen {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}

@@ -1,0 +1,55 @@
+.canvas-container {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  background-color: var(--cds-background);
+  cursor: default;
+
+  &--panning {
+    cursor: grab;
+
+    &:active {
+      cursor: grabbing;
+    }
+  }
+
+  &--dropping {
+    cursor: copy;
+  }
+}
+
+.canvas-container__info {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  z-index: 10;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  color: var(--cds-text-secondary);
+  background-color: var(--cds-layer-01);
+  border-radius: 2px;
+  border: 1px solid var(--cds-border-subtle);
+  user-select: none;
+  pointer-events: none;
+}
+
+.canvas-viewport {
+  position: absolute;
+  top: 40px;
+  left: 40px;
+  will-change: transform;
+}
+
+.canvas-screen {
+  position: relative;
+  box-shadow:
+    0 0 0 1px var(--cds-border-strong),
+    0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.canvas-grid {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}

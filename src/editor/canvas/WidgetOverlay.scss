@@ -1,0 +1,79 @@
+.widget-overlay {
+  position: absolute;
+  cursor: move;
+
+  &--hovered {
+    outline: 1px solid var(--pydm-hover);
+    outline-offset: 1px;
+  }
+
+  &--selected {
+    outline: 2px solid var(--pydm-selection);
+    outline-offset: 1px;
+  }
+}
+
+.widget-overlay__handle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background-color: var(--pydm-selection);
+  border: 1px solid var(--cds-background);
+  border-radius: 1px;
+  z-index: 10;
+
+  &--nw {
+    top: -4px;
+    left: -4px;
+    cursor: nw-resize;
+  }
+  &--ne {
+    top: -4px;
+    right: -4px;
+    cursor: ne-resize;
+  }
+  &--sw {
+    bottom: -4px;
+    left: -4px;
+    cursor: sw-resize;
+  }
+  &--se {
+    bottom: -4px;
+    right: -4px;
+    cursor: se-resize;
+  }
+  &--n {
+    top: -4px;
+    left: calc(50% - 4px);
+    cursor: n-resize;
+  }
+  &--s {
+    bottom: -4px;
+    left: calc(50% - 4px);
+    cursor: s-resize;
+  }
+  &--e {
+    top: calc(50% - 4px);
+    right: -4px;
+    cursor: e-resize;
+  }
+  &--w {
+    top: calc(50% - 4px);
+    left: -4px;
+    cursor: w-resize;
+  }
+}
+
+.widget-overlay__label {
+  position: absolute;
+  top: -18px;
+  left: 0;
+  font-size: 10px;
+  color: var(--cds-text-on-color);
+  background-color: var(--pydm-selection);
+  padding: 1px 4px;
+  border-radius: 2px;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+}
