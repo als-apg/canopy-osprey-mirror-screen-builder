@@ -16,6 +16,7 @@ import {
 import { LineWidget } from '../drawing/LineWidget';
 import { ScreenImageWidget } from '../drawing/ScreenImageWidget';
 import { useFitText } from '../shared/useFitText';
+import { ArcWidget } from '../drawing/ArcWidget';
 
 // ── Shared prop schemas ─────────────────────────────────────────────────────
 
@@ -409,6 +410,48 @@ export function registerBuiltinWidgets() {
       },
       { key: 'fill', label: 'Fill', type: 'boolean', section: 'appearance' },
       { key: 'fillColor', label: 'Fill Color', type: 'color', section: 'appearance' },
+    ],
+  });
+
+  widgetRegistry.register({
+    type: 'Arc',
+    label: 'Arc',
+    category: 'drawing',
+    icon: 'CircleDash',
+    defaultLayout: { x: 0, y: 0, width: 80, height: 80 },
+    defaultProps: {
+      lineColor: '#6f6f6f',
+      lineWidth: 2,
+      startAngle: 0,
+      spanAngle: 90,
+    },
+    component: ArcWidget,
+    propsSchema: [
+      { key: 'lineColor', label: 'Line Color', type: 'color', section: 'appearance' },
+      {
+        key: 'lineWidth',
+        label: 'Line Width',
+        type: 'number',
+        section: 'appearance',
+        min: 0,
+        max: 20,
+      },
+      {
+        key: 'startAngle',
+        label: 'Start Angle',
+        type: 'number',
+        section: 'appearance',
+        min: -360,
+        max: 360,
+      },
+      {
+        key: 'spanAngle',
+        label: 'Span Angle',
+        type: 'number',
+        section: 'appearance',
+        min: -360,
+        max: 360,
+      },
     ],
   });
 

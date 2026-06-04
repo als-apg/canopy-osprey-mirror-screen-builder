@@ -27,6 +27,22 @@ import type { WidgetType } from '../../types/widget';
 import { useEditorStore } from '../model/EditorStore';
 import './WidgetPalette.scss';
 
+function ArcIcon({ size }: { size: number }) {
+  const r = size / 2 - 1;
+  const cx = size / 2;
+  const cy = size / 2;
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} fill="none">
+      <path
+        d={`M ${cx + r} ${cy} A ${r} ${r} 0 0 1 ${cx} ${cy - r}`}
+        stroke="currentColor"
+        strokeWidth={1.5}
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 // ── Icon mapping ────────────────────────────────────────────────────────────
 
 const WIDGET_ICONS: Partial<Record<WidgetType, React.ComponentType<{ size: number }>>> = {
@@ -45,6 +61,7 @@ const WIDGET_ICONS: Partial<Record<WidgetType, React.ComponentType<{ size: numbe
   PVMeter: Meter,
   Rectangle: SquareOutline,
   Ellipse: CircleDash,
+  Arc: ArcIcon,
   Line: HorizontalLineSolid,
   StaticLabel: Label,
   ScreenImage: Image,
