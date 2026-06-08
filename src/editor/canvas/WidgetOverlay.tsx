@@ -31,6 +31,8 @@ export function WidgetOverlay({
   const { width, height } = widget.layout;
   const x = widget.layout.x - (parentOrigin?.x ?? 0);
   const y = widget.layout.y - (parentOrigin?.y ?? 0);
+  const transparency = Math.min(100, Math.max(0, (widget.props.opacity as number) ?? 0));
+  const widgetOpacity = 1 - transparency / 100;
 
   return (
     <div
@@ -48,7 +50,7 @@ export function WidgetOverlay({
       onMouseEnter={onHover}
       onMouseLeave={onHoverEnd}
     >
-      {children}
+      <div style={{ width: '100%', height: '100%', opacity: widgetOpacity }}>{children}</div>
 
       {/* Selection handles */}
       {isSelected && (

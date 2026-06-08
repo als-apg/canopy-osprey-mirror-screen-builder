@@ -38,12 +38,12 @@ const appearanceSchemas: PropSchema[] = [
   { key: 'fontSize', label: 'Font Size', type: 'number', section: 'appearance', min: 8, max: 72 },
   {
     key: 'opacity',
-    label: 'Opacity',
+    label: 'Transparency (%)',
     type: 'number',
     section: 'appearance',
     min: 0,
-    max: 1,
-    step: 0.1,
+    max: 100,
+    step: 1,
   },
 ];
 
@@ -101,6 +101,7 @@ function StaticLabelWidget({ layout, props, isSelected }: WidgetRendererProps) {
         width: layout.width,
         height: layout.height,
         color: props.foregroundColor ?? '#f4f4f4',
+        backgroundColor: (props.backgroundColor as string) ?? 'transparent',
         display: 'flex',
         alignItems: 'center',
         padding: '0 4px',
@@ -510,7 +511,7 @@ export function registerBuiltinWidgets() {
     category: 'drawing',
     icon: 'TextShortParagraph',
     defaultLayout: { x: 0, y: 0, width: 120, height: 24 },
-    defaultProps: { text: 'Label', foregroundColor: '#f4f4f4', fontSize: 14 },
+    defaultProps: { text: 'Label', foregroundColor: '#f4f4f4', fontSize: 14, opacity: 0 },
     component: StaticLabelWidget,
     propsSchema: [
       { key: 'text', label: 'Text', type: 'string', section: 'display' },
