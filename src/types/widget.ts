@@ -9,13 +9,9 @@ export const AlarmSeverity = {
 } as const;
 export type AlarmSeverity = (typeof AlarmSeverity)[keyof typeof AlarmSeverity];
 
-export const AlarmSeverityName: Record<AlarmSeverity, string> = {
-  [AlarmSeverity.NO_ALARM]: 'NO_ALARM',
-  [AlarmSeverity.MINOR]: 'MINOR',
-  [AlarmSeverity.MAJOR]: 'MAJOR',
-  [AlarmSeverity.INVALID]: 'INVALID',
-  [AlarmSeverity.DISCONNECTED]: 'DISCONNECTED',
-};
+export const AlarmSeverityName: Record<AlarmSeverity, string> = Object.fromEntries(
+  Object.entries(AlarmSeverity).map(([name, value]) => [value, name])
+) as Record<AlarmSeverity, string>;
 
 // ── Display Format ──────────────────────────────���────────────────────────────
 
@@ -78,38 +74,40 @@ export interface Size {
 
 export interface AbsoluteLayout extends Position, Size {}
 
-// ── Widget Model ────────────────────────────────���────────────────────────────
+// ── Widget Catalog ───────────────────────────────────────────────────────────
+// Single source of truth for widget types and how they are imported in
+// generated TSX. Both parseTSX (recognising tags) and generateTSX (emitting
+// imports) read from here, so adding a widget is a one-line change.
 
-export type WidgetType =
-  // PV Wrappers (Carbon-based)
-  | 'PVTextDisplay'
-  | 'PVTextInput'
-  | 'PVButton'
-  | 'PVDropdown'
-  | 'PVCheckbox'
-  | 'PVRadioGroup'
-  | 'PVSlider'
-  | 'PVSpinbox'
-  | 'PVToggle'
-  | 'PVProgressBar'
-  // Custom Instruments
-  | 'PVLed'
-  | 'PVByteIndicator'
-  | 'PVMeter'
-  | 'PVGauge'
-  | 'PVTank'
-  | 'PVThermometer'
-  // Drawing
-  | 'Rectangle'
-  | 'Ellipse'
-  | 'Line'
-  | 'Arc'
-  | 'StaticLabel'
-  | 'ScreenImage'
-  // Containers
-  | 'Group'
-  | 'EmbeddedScreen'
-  | 'PVTabs';
+export const WIDGET_CATALOG = {
+  pvWrappers: [
+    'PVTextDisplay',
+    'PVTextInput',
+    'PVButton',
+    'PVDropdown',
+    'PVCheckbox',
+    'PVRadioGroup',
+    'PVSlider',
+    'PVSpinbox',
+    'PVToggle',
+    'PVProgressBar',
+    'PVTabs',
+  ],
+  indicators: ['PVLed', 'PVByteIndicator', 'PVMeter', 'PVGauge', 'PVTank', 'PVThermometer'],
+  drawings: ['Rectangle', 'Ellipse', 'Line', 'Arc', 'StaticLabel', 'ScreenImage'],
+  containers: ['Group', 'EmbeddedScreen'],
+} as const;
+
+export type WidgetType = (typeof WIDGET_CATALOG)[keyof typeof WIDGET_CATALOG][number];
+
+export const ALL_WIDGET_TYPES: readonly WidgetType[] = [
+  ...WIDGET_CATALOG.pvWrappers,
+  ...WIDGET_CATALOG.indicators,
+  ...WIDGET_CATALOG.drawings,
+  ...WIDGET_CATALOG.containers,
+];
+
+// ── Widget Model ────────────────────────────────���────────────────────────────
 
 export interface WidgetProps {
   // PV binding

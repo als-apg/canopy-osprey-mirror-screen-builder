@@ -1,6 +1,6 @@
 import { nanoid } from 'nanoid';
 import type { ScreenModel, ScreenMeta, Widget, WidgetType, WidgetProps } from '../../types/widget';
-import { createDefaultScreen, createDefaultScreenMeta } from '../../types/widget';
+import { createDefaultScreen, createDefaultScreenMeta, ALL_WIDGET_TYPES } from '../../types/widget';
 
 function numProp(v: unknown, fallback: number): number {
   if (typeof v === 'number') return v;
@@ -120,37 +120,9 @@ interface ParsedWidget {
   props: Record<string, unknown>;
 }
 
-const WIDGET_TYPES = [
-  'PVTextDisplay',
-  'PVTextInput',
-  'PVButton',
-  'PVDropdown',
-  'PVCheckbox',
-  'PVRadioGroup',
-  'PVSlider',
-  'PVSpinbox',
-  'PVToggle',
-  'PVProgressBar',
-  'PVLed',
-  'PVByteIndicator',
-  'PVMeter',
-  'PVGauge',
-  'PVTank',
-  'PVThermometer',
-  'Rectangle',
-  'Ellipse',
-  'Line',
-  'Arc',
-  'StaticLabel',
-  'ScreenImage',
-  'Group',
-  'EmbeddedScreen',
-  'PVTabs',
-];
-
 function parseWidgetElements(code: string): ParsedWidget[] {
   const widgets: ParsedWidget[] = [];
-  const typePattern = WIDGET_TYPES.join('|');
+  const typePattern = ALL_WIDGET_TYPES.join('|');
 
   // Use [\s\S] instead of [^>] to handle multi-line props
   // Match self-closing: <Type ... />

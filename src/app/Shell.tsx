@@ -86,8 +86,8 @@ export function Shell() {
     <Theme theme={editorTheme}>
       <PVServiceProvider>
         <div className="shell">
-          <Header aria-label="PyDM Screen Builder">
-            <HeaderName prefix="PyDM">Screen Builder</HeaderName>
+          <Header aria-label="Canopy Screen Builder">
+            <HeaderName prefix="Canopy">Screen Builder</HeaderName>
             <HeaderGlobalBar>
               <HeaderGlobalAction
                 aria-label="Toggle Theme"

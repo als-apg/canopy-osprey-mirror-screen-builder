@@ -1,4 +1,5 @@
 import type { ScreenModel, Widget, WidgetType } from '../../types/widget';
+import { WIDGET_CATALOG } from '../../types/widget';
 
 /**
  * Generates a human-readable TSX file from the internal screen model.
@@ -24,48 +25,12 @@ export function generateTSX(screen: ScreenModel): string {
   };
   collectTypes(screen.rootWidgetIds);
 
-  // Build imports
-  const pvWrapperTypes = [
-    'PVTextDisplay',
-    'PVTextInput',
-    'PVButton',
-    'PVDropdown',
-    'PVCheckbox',
-    'PVRadioGroup',
-    'PVSlider',
-    'PVSpinbox',
-    'PVToggle',
-    'PVProgressBar',
-    'PVTabs',
-  ] as const;
-  const indicatorTypes = [
-    'PVLed',
-    'PVByteIndicator',
-    'PVMeter',
-    'PVGauge',
-    'PVTank',
-    'PVThermometer',
-  ] as const;
-  const drawingTypes = [
-    'Rectangle',
-    'Ellipse',
-    'Line',
-    'Arc',
-    'StaticLabel',
-    'ScreenImage',
-  ] as const;
-  const containerTypes = ['Group', 'EmbeddedScreen'] as const;
-
-  const pvWrappers = [...usedTypes].filter((t) =>
-    (pvWrapperTypes as readonly string[]).includes(t)
-  );
-  const indicators = [...usedTypes].filter((t) =>
-    (indicatorTypes as readonly string[]).includes(t)
-  );
-  const drawings = [...usedTypes].filter((t) => (drawingTypes as readonly string[]).includes(t));
-  const containers = [...usedTypes].filter((t) =>
-    (containerTypes as readonly string[]).includes(t)
-  );
+  // Group used types by their import bucket from the central catalog.
+  const inBucket = (bucket: readonly string[], t: WidgetType) => bucket.includes(t);
+  const pvWrappers = [...usedTypes].filter((t) => inBucket(WIDGET_CATALOG.pvWrappers, t));
+  const indicators = [...usedTypes].filter((t) => inBucket(WIDGET_CATALOG.indicators, t));
+  const drawings = [...usedTypes].filter((t) => inBucket(WIDGET_CATALOG.drawings, t));
+  const containers = [...usedTypes].filter((t) => inBucket(WIDGET_CATALOG.containers, t));
 
   const imports: string[] = [];
 

@@ -35,6 +35,67 @@ interface WindowWithFS {
 }
 const fsWindow = () => window as unknown as WindowWithFS;
 
+const TSX_FILE_TYPES = [{ description: 'TSX Files', accept: { 'text/typescript': ['.tsx'] } }];
+
+/**
+ * Writes TSX to disk, preferring the File System Access API and falling back
+ * to a download. On success, returns the saved file's name (or null if the
+ * browser performed a download and we don't know where it landed). Returns
+ * undefined if the user cancelled the picker.
+ */
+async function writeTSX(
+  code: string,
+  suggestedName: string
+): Promise<{ savedName: string | null } | undefined> {
+  try {
+    if ('showSaveFilePicker' in window) {
+      const handle = await fsWindow().showSaveFilePicker({
+        suggestedName,
+        types: TSX_FILE_TYPES,
+      });
+      const writable = await handle.createWritable();
+      await writable.write(code);
+      await writable.close();
+      return { savedName: handle.name };
+    }
+    const blob = new Blob([code], { type: 'text/typescript' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = suggestedName;
+    a.click();
+    URL.revokeObjectURL(url);
+    return { savedName: null };
+  } catch {
+    // User cancelled the picker.
+    return undefined;
+  }
+}
+
+/** Reads a TSX file from disk via the picker or a hidden file input. */
+async function readTSX(): Promise<{ name: string; code: string } | null> {
+  try {
+    if ('showOpenFilePicker' in window) {
+      const [handle] = await fsWindow().showOpenFilePicker({ types: TSX_FILE_TYPES });
+      const file = await handle.getFile();
+      return { name: handle.name, code: await file.text() };
+    }
+    return await new Promise((resolve) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.tsx,.ts,.jsx';
+      input.onchange = async () => {
+        const file = input.files?.[0];
+        if (!file) return resolve(null);
+        resolve({ name: file.name, code: await file.text() });
+      };
+      input.click();
+    });
+  } catch {
+    return null;
+  }
+}
+
 // ── Selection State ────────────────────────────────────���─────────────────────
 
 interface SelectionState {
@@ -101,6 +162,11 @@ interface EditorState {
 
   // Palette drag (mouse-event based, replaces HTML5 DnD for Tauri compat)
   paletteDrag: { type: WidgetType } | null;
+
+  // Undo coalescing (in-memory only): merges rapid same-target edits
+  // (e.g. typing in a property field) into a single undo entry.
+  _lastUndoKey: string | null;
+  _lastUndoTime: number;
 }
 
 interface EditorActions {
@@ -148,7 +214,7 @@ interface EditorActions {
   setEditorTheme(theme: 'white' | 'g10' | 'g90' | 'g100'): void;
 
   // Undo/Redo
-  pushUndo(): void;
+  pushUndo(coalesceKey?: string): void;
   undo(): void;
   redo(): void;
 
@@ -170,6 +236,8 @@ interface EditorActions {
 }
 
 export type EditorStore = EditorState & EditorActions;
+
+const UNDO_CAP = 50;
 
 const DEFAULT_PANELS: PanelState = {
   paletteOpen: true,
@@ -196,6 +264,8 @@ export const useEditorStore = create<EditorStore>()(
     redoStack: [],
     clipboard: [],
     paletteDrag: null,
+    _lastUndoKey: null,
+    _lastUndoTime: 0,
 
     // ── Screen ─────────────────────────────────────────────────────────────
 
@@ -286,7 +356,7 @@ export const useEditorStore = create<EditorStore>()(
     },
 
     updateWidget(id, updates) {
-      get().pushUndo();
+      get().pushUndo(`widget:${id}:${Object.keys(updates).sort().join(',')}`);
       set((s) => {
         const widget = s.screen.widgets[id];
         if (widget) {
@@ -297,7 +367,7 @@ export const useEditorStore = create<EditorStore>()(
     },
 
     updateWidgetProps(id, props) {
-      get().pushUndo();
+      get().pushUndo(`props:${id}:${Object.keys(props).sort().join(',')}`);
       set((s) => {
         const widget = s.screen.widgets[id];
         if (widget) {
@@ -308,7 +378,7 @@ export const useEditorStore = create<EditorStore>()(
     },
 
     updateWidgetLayout(id, layout) {
-      get().pushUndo();
+      get().pushUndo(`layout:${id}:${Object.keys(layout).sort().join(',')}`);
       set((s) => {
         const widget = s.screen.widgets[id];
         if (widget) {
@@ -539,40 +609,56 @@ export const useEditorStore = create<EditorStore>()(
     },
 
     // ── Undo/Redo (snapshot-based) ────────────────────────────────────────
+    // We rely on immer to freeze each producer's output. State outside the
+    // producer is therefore deep-immutable, so we can stash references on the
+    // undo stack rather than deep-cloning the screen on every keystroke.
 
-    pushUndo() {
+    pushUndo(coalesceKey) {
+      const state = get();
+      const now = Date.now();
+
+      // Coalesce rapid successive edits to the same target into one entry —
+      // typing "PV:NAME" should be one undo, not seven.
+      if (coalesceKey && state._lastUndoKey === coalesceKey && now - state._lastUndoTime < 500) {
+        set((s) => {
+          s._lastUndoTime = now;
+        });
+        return;
+      }
+
+      const prevScreen = state.screen;
       set((s) => {
-        const snapshot = JSON.parse(JSON.stringify(s.screen)) as ScreenModel;
-        s.undoStack.push(snapshot);
-        // Cap at 50 snapshots
-        if (s.undoStack.length > 50) s.undoStack.shift();
+        s.undoStack.push(prevScreen);
+        if (s.undoStack.length > UNDO_CAP) s.undoStack.shift();
         s.redoStack = [];
+        s._lastUndoKey = coalesceKey ?? null;
+        s._lastUndoTime = now;
       });
     },
 
     undo() {
       const state = get();
       if (state.undoStack.length === 0) return;
+      const currentScreen = state.screen;
       set((s) => {
-        const currentSnapshot = JSON.parse(JSON.stringify(s.screen)) as ScreenModel;
-        s.redoStack.push(currentSnapshot);
-        const prev = s.undoStack.pop()!;
-        s.screen = prev;
+        s.redoStack.push(currentScreen);
+        s.screen = s.undoStack.pop()!;
         s.selection.selectedIds = [];
         s.isDirty = true;
+        s._lastUndoKey = null;
       });
     },
 
     redo() {
       const state = get();
       if (state.redoStack.length === 0) return;
+      const currentScreen = state.screen;
       set((s) => {
-        const currentSnapshot = JSON.parse(JSON.stringify(s.screen)) as ScreenModel;
-        s.undoStack.push(currentSnapshot);
-        const next = s.redoStack.pop()!;
-        s.screen = next;
+        s.undoStack.push(currentScreen);
+        s.screen = s.redoStack.pop()!;
         s.selection.selectedIds = [];
         s.isDirty = true;
+        s._lastUndoKey = null;
       });
     },
 
@@ -580,129 +666,38 @@ export const useEditorStore = create<EditorStore>()(
 
     async saveToFile() {
       const state = get();
-      const code = generateTSX(state.screen);
-
-      try {
-        if ('showSaveFilePicker' in window) {
-          // File System Access API (Chrome/Edge)
-          const handle = await fsWindow().showSaveFilePicker({
-            suggestedName: state.filePath?.split(/[/\\]/).pop() ?? 'screen.tsx',
-            types: [{ description: 'TSX Files', accept: { 'text/typescript': ['.tsx'] } }],
-          });
-          const writable = await handle.createWritable();
-          await writable.write(code);
-          await writable.close();
-          set((s) => {
-            s.filePath = handle.name;
-            s.isDirty = false;
-          });
-        } else {
-          // Fallback: download
-          const blob = new Blob([code], { type: 'text/typescript' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = state.filePath?.split(/[/\\]/).pop() ?? 'screen.tsx';
-          a.click();
-          URL.revokeObjectURL(url);
-          set((s) => {
-            s.isDirty = false;
-          });
-        }
-      } catch (e) {
-        // User cancelled
-        console.log('Save cancelled', e);
-      }
+      const suggestedName = state.filePath?.split(/[/\\]/).pop() ?? 'screen.tsx';
+      const result = await writeTSX(generateTSX(state.screen), suggestedName);
+      if (!result) return;
+      set((s) => {
+        if (result.savedName !== null) s.filePath = result.savedName;
+        s.isDirty = false;
+      });
     },
 
     async saveAsFile() {
       const state = get();
-      const code = generateTSX(state.screen);
-      try {
-        if ('showSaveFilePicker' in window) {
-          const handle = await fsWindow().showSaveFilePicker({
-            suggestedName: state.screen.meta.title.replace(/[^a-zA-Z0-9]/g, '') + '.tsx',
-            types: [{ description: 'TSX Files', accept: { 'text/typescript': ['.tsx'] } }],
-          });
-          const writable = await handle.createWritable();
-          await writable.write(code);
-          await writable.close();
-          set((s) => {
-            s.filePath = handle.name;
-            s.isDirty = false;
-          });
-        } else {
-          const blob = new Blob([code], { type: 'text/typescript' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = state.screen.meta.title.replace(/[^a-zA-Z0-9]/g, '') + '.tsx';
-          a.click();
-          URL.revokeObjectURL(url);
-          set((s) => {
-            s.isDirty = false;
-          });
-        }
-      } catch (e) {
-        console.log('Save As cancelled', e);
-      }
+      const suggestedName = state.screen.meta.title.replace(/[^a-zA-Z0-9]/g, '') + '.tsx';
+      const result = await writeTSX(generateTSX(state.screen), suggestedName);
+      if (!result) return;
+      set((s) => {
+        if (result.savedName !== null) s.filePath = result.savedName;
+        s.isDirty = false;
+      });
     },
 
     async openFile() {
-      try {
-        if ('showOpenFilePicker' in window) {
-          const [handle] = await fsWindow().showOpenFilePicker({
-            types: [{ description: 'TSX Files', accept: { 'text/typescript': ['.tsx'] } }],
-          });
-          const file = await handle.getFile();
-          const code = await file.text();
-          console.log('[Screen Builder] Parsing file:', handle.name, 'length:', code.length);
-          const screen = parseTSX(code);
-          console.log(
-            '[Screen Builder] Parsed:',
-            screen.rootWidgetIds.length,
-            'widgets, title:',
-            screen.meta.title
-          );
-          set((s) => {
-            s.screen = screen;
-            s.filePath = handle.name;
-            s.isDirty = false;
-            s.selection.selectedIds = [];
-            s.undoStack = [];
-            s.redoStack = [];
-          });
-        } else {
-          // Fallback: file input
-          const input = document.createElement('input');
-          input.type = 'file';
-          input.accept = '.tsx,.ts,.jsx';
-          input.onchange = async () => {
-            const file = input.files?.[0];
-            if (!file) return;
-            const code = await file.text();
-            console.log('[Screen Builder] Parsing file:', file.name, 'length:', code.length);
-            const screen = parseTSX(code);
-            console.log(
-              '[Screen Builder] Parsed:',
-              screen.rootWidgetIds.length,
-              'widgets, title:',
-              screen.meta.title
-            );
-            set((s) => {
-              s.screen = screen;
-              s.filePath = file.name;
-              s.isDirty = false;
-              s.selection.selectedIds = [];
-              s.undoStack = [];
-              s.redoStack = [];
-            });
-          };
-          input.click();
-        }
-      } catch (e) {
-        console.log('Open cancelled', e);
-      }
+      const result = await readTSX();
+      if (!result) return;
+      const screen = parseTSX(result.code);
+      set((s) => {
+        s.screen = screen;
+        s.filePath = result.name;
+        s.isDirty = false;
+        s.selection.selectedIds = [];
+        s.undoStack = [];
+        s.redoStack = [];
+      });
     },
 
     exportTSX() {
