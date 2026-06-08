@@ -23,6 +23,7 @@
   border-color: var(--cds-border-subtle);
   background-color: var(--cds-layer-01);
   overflow-y: auto;
+  position: relative;
 
   &--left {
     border-right: 1px solid var(--cds-border-subtle);
@@ -31,6 +32,37 @@
   &--right {
     border-left: 1px solid var(--cds-border-subtle);
     width: 300px;
+  }
+
+  &--collapsed {
+    width: 32px;
+    min-width: 32px;
+  }
+}
+
+.shell__sidebar-toggle {
+  align-self: flex-end;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin: auto 4px 4px auto;
+  background: transparent;
+  border: 1px solid var(--cds-border-subtle);
+  border-radius: 2px;
+  color: var(--cds-text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+
+  &:hover {
+    background-color: var(--cds-layer-hover-01);
+    color: var(--cds-text-primary);
+  }
+
+  &--start {
+    align-self: flex-start;
+    margin: auto auto 4px 4px;
   }
 }
 
