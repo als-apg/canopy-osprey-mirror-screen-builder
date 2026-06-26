@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { Button } from '@carbon/react';
 import {
   DocumentAdd,
+  DocumentImport,
   FolderOpen,
   Save,
   SaveModel,
@@ -27,6 +28,7 @@ export function Toolbar() {
   const saveToFile = useEditorStore((s) => s.saveToFile);
   const saveAsFile = useEditorStore((s) => s.saveAsFile);
   const openFile = useEditorStore((s) => s.openFile);
+  const importLegacyScreen = useEditorStore((s) => s.importLegacyScreen);
   const setScreen = useEditorStore((s) => s.setScreen);
   const undoStack = useEditorStore((s) => s.undoStack);
   const redoStack = useEditorStore((s) => s.redoStack);
@@ -94,6 +96,18 @@ export function Toolbar() {
           iconDescription="Open File"
           tooltipPosition="bottom"
           onClick={openFile}
+        />
+        <Button
+          kind="ghost"
+          size="sm"
+          hasIconOnly
+          renderIcon={DocumentImport}
+          iconDescription="Import legacy screen (.edl/.ui)"
+          tooltipPosition="bottom"
+          onClick={() => {
+            if (isDirty && !confirm('Discard unsaved changes?')) return;
+            void importLegacyScreen();
+          }}
         />
         <Button
           kind="ghost"

@@ -59,12 +59,19 @@ export function generateTSX(screen: ScreenModel): string {
       ? `{ ${macroEntries.map(([k, v]) => `${k}: '${v}'`).join(', ')} }`
       : '{}';
 
+  // Screen-level Fox formulas are author-facing data; emit them as a JSON
+  // array so they round-trip losslessly through parseTSX.
+  const formulasLine =
+    screen.meta.formulas && screen.meta.formulas.length > 0
+      ? `\n  formulas: ${JSON.stringify(screen.meta.formulas)},`
+      : '';
+
   const metaBlock = `const screenMeta = {
   title: '${screen.meta.title}',
   width: ${screen.meta.width},
   height: ${screen.meta.height},
   backgroundColor: '${screen.meta.backgroundColor}',
-  macros: ${macrosStr},
+  macros: ${macrosStr},${formulasLine}
 } satisfies ScreenProps;`;
 
   // Build component name from title

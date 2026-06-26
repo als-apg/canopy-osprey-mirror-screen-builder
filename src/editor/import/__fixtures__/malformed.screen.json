@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "1.0",
+  "kind": "screen",
+  "id": "malformed",
+  "metadata": {
+    "title": "Missing size",
+    "source": { "type": "edl-converter" }
+  },
+  "macros": [],
+  "root": {
+    "id": "w-001",
+    "type": "absolute-canvas",
+    "props": {},
+    "geometry": { "x": 0, "y": 0, "width": 100, "height": 100 },
+    "children": []
+  }
+}

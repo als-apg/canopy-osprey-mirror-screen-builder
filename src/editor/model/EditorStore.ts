@@ -12,6 +12,12 @@ import type {
 import { createDefaultScreen } from '../../types/widget';
 import { generateTSX } from '../code/generateTSX';
 import { parseTSX } from '../code/parseTSX';
+import {
+  importScreenJSON,
+  ImportValidationError,
+  type ImportReport,
+} from '../import/importScreenJSON';
+import { convertScreen, ConverterError } from '../../services/converter/convertScreen';
 
 // Minimal shape of the File System Access API used by save/open. The full
 // types ship with `lib.dom.d.ts` in newer TS releases; this local subset keeps
@@ -72,18 +78,32 @@ async function writeTSX(
   }
 }
 
-/** Reads a TSX file from disk via the picker or a hidden file input. */
-async function readTSX(): Promise<{ name: string; code: string } | null> {
+const OPEN_FILE_TYPES = [
+  {
+    description: 'Screen Files',
+    accept: {
+      'text/typescript': ['.tsx', '.ts', '.jsx'],
+      'application/json': ['.json'],
+    },
+  },
+];
+
+/**
+ * Reads a screen file from disk via the picker or a hidden file input.
+ * Accepts both TSX screens and `.screen.json` IR documents; the caller routes
+ * by name/content.
+ */
+async function readScreenFile(): Promise<{ name: string; code: string } | null> {
   try {
     if ('showOpenFilePicker' in window) {
-      const [handle] = await fsWindow().showOpenFilePicker({ types: TSX_FILE_TYPES });
+      const [handle] = await fsWindow().showOpenFilePicker({ types: OPEN_FILE_TYPES });
       const file = await handle.getFile();
       return { name: handle.name, code: await file.text() };
     }
     return await new Promise((resolve) => {
       const input = document.createElement('input');
       input.type = 'file';
-      input.accept = '.tsx,.ts,.jsx';
+      input.accept = '.tsx,.ts,.jsx,.json';
       input.onchange = async () => {
         const file = input.files?.[0];
         if (!file) return resolve(null);
@@ -93,6 +113,48 @@ async function readTSX(): Promise<{ name: string; code: string } | null> {
     });
   } catch {
     return null;
+  }
+}
+
+/** A picked legacy file plus the file handle for upload. */
+async function pickLegacyFile(): Promise<File | null> {
+  try {
+    if ('showOpenFilePicker' in window) {
+      const [handle] = await fsWindow().showOpenFilePicker({
+        types: [
+          {
+            description: 'Legacy Screens',
+            accept: { 'application/octet-stream': ['.edl', '.ui'] },
+          },
+        ],
+      });
+      return await handle.getFile();
+    }
+    return await new Promise((resolve) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.edl,.ui';
+      input.onchange = () => resolve(input.files?.[0] ?? null);
+      input.click();
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Decide whether a just-read file is a screen IR document (route to the JSON
+ * importer) or a TSX screen (route to parseTSX). Name suffix first, then a
+ * content sniff for `schemaVersion`.
+ */
+function isScreenJSON(name: string, code: string): boolean {
+  if (name.endsWith('.screen.json')) return true;
+  if (!name.endsWith('.json')) return false;
+  try {
+    const parsed = JSON.parse(code);
+    return !!parsed && typeof parsed === 'object' && 'schemaVersion' in parsed;
+  } catch {
+    return false;
   }
 }
 
@@ -137,6 +199,10 @@ interface EditorState {
   screen: ScreenModel;
   filePath: string | null;
   isDirty: boolean;
+
+  // Import diagnostics (set by the last .screen.json / legacy import)
+  lastImportReport: ImportReport | null;
+  importError: string[] | null;
 
   // Selection
   selection: SelectionState;
@@ -222,6 +288,8 @@ interface EditorActions {
   saveToFile(): Promise<void>;
   saveAsFile(): Promise<void>;
   openFile(): Promise<void>;
+  importLegacyScreen(): Promise<void>;
+  clearImportReport(): void;
   exportTSX(): string;
 
   // Clipboard
@@ -255,6 +323,8 @@ export const useEditorStore = create<EditorStore>()(
     screen: createDefaultScreen(),
     filePath: null,
     isDirty: false,
+    lastImportReport: null,
+    importError: null,
     selection: { selectedIds: [], hoveredId: null },
     viewport: { zoom: 1, panX: 0, panY: 0 },
     panels: DEFAULT_PANELS,
@@ -687,8 +757,38 @@ export const useEditorStore = create<EditorStore>()(
     },
 
     async openFile() {
-      const result = await readTSX();
+      const result = await readScreenFile();
       if (!result) return;
+
+      // Route .screen.json IR documents through the importer; TSX through parseTSX.
+      if (isScreenJSON(result.name, result.code)) {
+        let imported: { screen: ScreenModel; report: ImportReport };
+        try {
+          imported = importScreenJSON(JSON.parse(result.code));
+        } catch (err) {
+          // Surface validation errors; do NOT replace the current screen.
+          set((s) => {
+            s.importError =
+              err instanceof ImportValidationError
+                ? err.errors
+                : [err instanceof Error ? err.message : String(err)];
+            s.lastImportReport = null;
+          });
+          return;
+        }
+        set((s) => {
+          s.screen = imported.screen;
+          s.filePath = result.name;
+          s.isDirty = false;
+          s.selection.selectedIds = [];
+          s.undoStack = [];
+          s.redoStack = [];
+          s.lastImportReport = imported.report;
+          s.importError = null;
+        });
+        return;
+      }
+
       const screen = parseTSX(result.code);
       set((s) => {
         s.screen = screen;
@@ -697,6 +797,60 @@ export const useEditorStore = create<EditorStore>()(
         s.selection.selectedIds = [];
         s.undoStack = [];
         s.redoStack = [];
+      });
+    },
+
+    async importLegacyScreen() {
+      const file = await pickLegacyFile();
+      if (!file) return;
+      const kind = file.name.endsWith('.edl')
+        ? 'edl'
+        : file.name.endsWith('.ui')
+          ? 'ui'
+          : undefined;
+
+      let imported: { screen: ScreenModel; report: ImportReport };
+      try {
+        const dto = await convertScreen(file, kind ? { kind } : {});
+        imported = importScreenJSON(dto.screen);
+        // Merge the server's (richer) diagnostics into the client report.
+        imported.report.warnings.push(...dto.warnings);
+        for (const u of dto.unknownWidgets) {
+          const existing = imported.report.unknownWidgets.find(
+            (w) => w.originalClass === u.originalClass
+          );
+          if (existing) existing.count = Math.max(existing.count, u.count);
+          else imported.report.unknownWidgets.push({ ...u });
+        }
+      } catch (err) {
+        set((s) => {
+          s.importError =
+            err instanceof ImportValidationError
+              ? err.errors
+              : err instanceof ConverterError
+                ? [`${err.code}: ${err.message}`]
+                : [err instanceof Error ? err.message : String(err)];
+          s.lastImportReport = null;
+        });
+        return;
+      }
+
+      set((s) => {
+        s.screen = imported.screen;
+        s.filePath = file.name.replace(/\.(edl|ui)$/i, '.screen.json');
+        s.isDirty = true; // converted but unsaved
+        s.selection.selectedIds = [];
+        s.undoStack = [];
+        s.redoStack = [];
+        s.lastImportReport = imported.report;
+        s.importError = null;
+      });
+    },
+
+    clearImportReport() {
+      set((s) => {
+        s.lastImportReport = null;
+        s.importError = null;
       });
     },
 

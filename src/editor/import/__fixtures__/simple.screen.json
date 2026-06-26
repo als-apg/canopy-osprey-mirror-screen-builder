@@ -1,0 +1,104 @@
+{
+  "schemaVersion": "1.0",
+  "kind": "screen",
+  "id": "simple",
+  "metadata": {
+    "title": "Simple Test Screen",
+    "source": { "type": "edl-converter" },
+    "size": { "width": 640, "height": 480 }
+  },
+  "macros": [{ "name": "P", "default": "DEV:1" }],
+  "formulas": [
+    {
+      "name": "sum",
+      "kind": "scalar",
+      "expression": "A+B",
+      "bindings": { "A": "${P}:VAL", "B": "${P}:OFFSET" }
+    }
+  ],
+  "root": {
+    "id": "w-001",
+    "type": "absolute-canvas",
+    "props": { "width": 640, "height": 480 },
+    "geometry": { "x": 0, "y": 0, "width": 640, "height": 480 },
+    "children": [
+      {
+        "id": "w-002",
+        "type": "pv-label",
+        "props": { "pv": "${P}:READBACK", "precision": 3, "showUnits": true },
+        "geometry": { "x": 20, "y": 20, "width": 120, "height": 18 },
+        "rules": [
+          {
+            "id": "r-001",
+            "name": "color-by-alarm",
+            "targetProperty": "foregroundColor",
+            "default": "#ffffff",
+            "pvs": [
+              { "name": "${P}:SEVR", "trigger": true },
+              { "name": "fox://sum", "trigger": true }
+            ],
+            "conditions": [
+              { "expression": "{0} > 1", "value": "#ff0000" },
+              { "expression": "{1} > 100", "value": "#ffff00" }
+            ]
+          },
+          {
+            "id": "r-002",
+            "name": "visible-when",
+            "targetProperty": "visible",
+            "default": true,
+            "formula": "sum"
+          }
+        ]
+      },
+      {
+        "id": "w-003",
+        "type": "text-label",
+        "props": { "text": "Status", "align": "center" },
+        "geometry": { "x": 20, "y": 50, "width": 80, "height": 16 }
+      },
+      {
+        "id": "w-004",
+        "type": "pv-slider",
+        "props": {
+          "pv": "${P}:SETPOINT",
+          "min": 0,
+          "max": 10,
+          "showValue": true,
+          "orientation": "horizontal"
+        },
+        "geometry": { "x": 20, "y": 80, "width": 200, "height": 24 }
+      },
+      {
+        "id": "w-005",
+        "type": "group-box",
+        "props": { "title": "Controls", "flat": false },
+        "geometry": { "x": 300, "y": 20, "width": 280, "height": 200 },
+        "children": [
+          {
+            "id": "w-006",
+            "type": "pv-button",
+            "props": { "pv": "${P}:CMD", "label": "Go", "pressValue": 1 },
+            "geometry": { "x": 310, "y": 40, "width": 60, "height": 24 }
+          },
+          {
+            "id": "w-007",
+            "type": "pv-led",
+            "props": { "pv": "${P}:STATE" },
+            "geometry": { "x": 310, "y": 80, "width": 20, "height": 20 }
+          }
+        ]
+      },
+      {
+        "id": "w-008",
+        "type": "unknown-widget",
+        "props": {
+          "originalClass": "activeRectangleClass",
+          "originalProps": { "lineColor": "index 3", "fill": true }
+        },
+        "geometry": { "x": 20, "y": 120, "width": 260, "height": 100 },
+        "warnings": ["No registry entry for activeRectangleClass; rendering placeholder"]
+      }
+    ]
+  }
+}
