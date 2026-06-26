@@ -1,0 +1,10 @@
+.line-widget {
+  position: absolute;
+  top: 0;
+  left: 0;
+
+  &--selected {
+    // Subtle highlight around the SVG bounds
+    filter: drop-shadow(0 0 2px rgba(15, 98, 254, 0.4));
+  }
+}

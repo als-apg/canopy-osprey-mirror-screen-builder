@@ -1,0 +1,7 @@
+.selection-marquee {
+  position: absolute;
+  border: 1px solid var(--pydm-selection);
+  background-color: rgba(15, 98, 254, 0.1);
+  pointer-events: none;
+  z-index: 100;
+}

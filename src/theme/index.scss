@@ -1,0 +1,17 @@
+@use '@carbon/react' with (
+  $use-flexbox-grid: true
+);
+
+// Alarm severity tokens
+:root {
+  --pydm-alarm-none: #24a148;
+  --pydm-alarm-minor: #f1c21b;
+  --pydm-alarm-major: #da1e28;
+  --pydm-alarm-invalid: #a56eff;
+  --pydm-alarm-disconnected: #6f6f6f;
+
+  --pydm-selection: #0f62fe;
+  --pydm-hover: #4589ff;
+  --pydm-canvas-bg: #161616;
+  --pydm-grid-line: #21212180;
+}

@@ -1,0 +1,155 @@
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background-color: var(--cds-background);
+  color: var(--cds-text-primary);
+}
+
+.shell__body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  // Offset for Carbon header (48px) + toolbar (40px)
+  margin-top: 88px;
+}
+
+.shell__sidebar {
+  display: flex;
+  flex-direction: column;
+  width: 260px;
+  min-width: 200px;
+  border-color: var(--cds-border-subtle);
+  background-color: var(--cds-layer-01);
+  overflow-y: auto;
+
+  &--left {
+    border-right: 1px solid var(--cds-border-subtle);
+  }
+
+  &--right {
+    border-left: 1px solid var(--cds-border-subtle);
+    width: 300px;
+  }
+}
+
+.shell__canvas-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  min-width: 0;
+}
+
+.shell__canvas-top {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+
+  &--split {
+    flex: 1;
+    min-height: 200px;
+  }
+}
+
+.shell__code-panel {
+  height: 300px;
+  min-height: 150px;
+  border-top: 1px solid var(--cds-border-subtle);
+  flex-shrink: 0;
+}
+
+.shell__canvas-title {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 1rem;
+  font-size: 0.75rem;
+  color: var(--cds-text-secondary);
+  background-color: var(--cds-layer-01);
+  border-bottom: 1px solid var(--cds-border-subtle);
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.shell__title-text {
+  cursor: default;
+  padding: 2px 6px;
+  border-radius: 2px;
+  color: var(--cds-text-primary);
+
+  &:hover {
+    background-color: var(--cds-layer-hover-01);
+  }
+}
+
+.shell__title-input {
+  background: var(--cds-field-01);
+  border: 1px solid var(--pydm-selection);
+  border-radius: 2px;
+  color: var(--cds-text-primary);
+  font-size: 0.75rem;
+  padding: 2px 6px;
+  outline: none;
+  width: 200px;
+}
+
+.shell__file-path {
+  font-size: 0.625rem;
+  color: var(--cds-text-helper);
+  font-family: 'IBM Plex Mono', monospace;
+  opacity: 0.7;
+}
+
+.shell__canvas-area--split {
+  flex: 1;
+  min-width: 0;
+}
+
+.shell__live-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-left: 1px solid var(--cds-border-subtle);
+
+  &--split {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+.shell__mode-switch {
+  background: none;
+  border: 1px solid var(--cds-border-subtle);
+  border-radius: 2px;
+  color: var(--cds-link-primary);
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 2px 8px;
+
+  &:hover {
+    background-color: var(--cds-layer-hover-01);
+  }
+}
+
+.shell__drag-ghost {
+  position: fixed;
+  transform: translate(12px, 12px);
+  pointer-events: none;
+  z-index: 9999;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  color: var(--cds-text-on-color);
+  background-color: var(--cds-background-brand);
+  border-radius: 2px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  user-select: none;
+}

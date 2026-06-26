@@ -1,0 +1,112 @@
+// ── PV Text Display ─────────────────────────────────────────────────────────
+
+.carbon-pv-display {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  background-color: var(--cds-field-01, #262626);
+  border: 1px solid var(--cds-border-subtle, #393939);
+  border-radius: 2px;
+  overflow: hidden;
+
+  &--selected {
+    outline: 2px solid var(--pydm-selection);
+    outline-offset: 1px;
+  }
+}
+
+.carbon-pv-display__label {
+  font-size: 0.6875rem;
+  color: var(--cds-text-secondary, #8d8d8d);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.carbon-pv-display__value {
+  font-size: 0.8125rem;
+  font-family: 'IBM Plex Mono', monospace;
+  color: var(--cds-text-primary, #f4f4f4);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  text-align: right;
+}
+
+.carbon-pv-display__alarm-tag {
+  flex-shrink: 0;
+  margin: 0 !important;
+}
+
+// ── PV Text Input ───────────────────────────────────────────────────────────
+
+.carbon-pv-input {
+  &--selected {
+    outline: 2px solid var(--pydm-selection);
+    outline-offset: 1px;
+  }
+
+  // Override Carbon TextInput to fit within widget bounds
+  .cds--text-input-wrapper {
+    height: 100%;
+  }
+  .cds--text-input {
+    height: 100%;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.8125rem;
+  }
+}
+
+// ── PV Button ───────────────────────────────────────────────────────────────
+
+.carbon-pv-button {
+  // Ensure Carbon button fills its container
+  justify-content: center;
+}
+
+// ── PV Slider ───────────────────────────────────────────────────────────────
+
+.carbon-pv-slider {
+  display: flex;
+  align-items: center;
+  padding: 0 4px;
+
+  &--selected {
+    outline: 2px solid var(--pydm-selection);
+    outline-offset: 1px;
+    border-radius: 2px;
+  }
+
+  // Carbon Slider overrides to fit widget
+  .cds--slider-container {
+    width: 100%;
+  }
+  .cds--slider__range-label {
+    font-size: 0.625rem;
+  }
+}
+
+// ── PV Progress Bar ─────────────────────────────────────────────────────────
+
+.carbon-pv-progress {
+  display: flex;
+  align-items: center;
+
+  &--selected {
+    outline: 2px solid var(--pydm-selection);
+    outline-offset: 1px;
+    border-radius: 2px;
+  }
+
+  .cds--progress-bar {
+    width: 100%;
+  }
+}
+
+// ── PV LED ──────────────────────────────────────────────────────────────────
+
+.carbon-pv-led {
+  cursor: default;
+}
