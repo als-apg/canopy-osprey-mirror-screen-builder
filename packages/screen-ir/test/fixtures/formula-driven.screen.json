@@ -1,0 +1,62 @@
+{
+  "schemaVersion": "1.0",
+  "kind": "screen",
+  "id": "formula-driven",
+  "metadata": {
+    "title": "Formula-driven props",
+    "source": { "type": "screen-builder", "savedAt": "2026-06-26T00:00:00Z" },
+    "size": { "width": 400, "height": 300 }
+  },
+  "macros": [{ "name": "P", "default": "DEMO:VAC1" }],
+  "formulas": [
+    {
+      "name": "f-001",
+      "kind": "scalar",
+      "expression": "A + B",
+      "bindings": { "A": "${P}:V1", "B": "${P}:V2" }
+    },
+    { "name": "f-002", "expression": "A * 2", "bindings": { "A": "${P}:RAW" } }
+  ],
+  "root": {
+    "id": "w-001",
+    "type": "absolute-canvas",
+    "props": { "width": 400, "height": 300 },
+    "geometry": { "x": 0, "y": 0, "width": 400, "height": 300 },
+    "children": [
+      {
+        "id": "w-002",
+        "type": "pv-label",
+        "props": { "pv": "fox://f-001" },
+        "geometry": { "x": 10, "y": 10, "width": 200, "height": 30 },
+        "rules": [
+          {
+            "id": "r-001",
+            "name": "Width tracks formula",
+            "targetProperty": "width",
+            "formula": "f-002",
+            "default": 100
+          }
+        ]
+      },
+      {
+        "id": "w-003",
+        "type": "pv-led",
+        "props": { "pv": "${P}:STATUS" },
+        "geometry": { "x": 10, "y": 50, "width": 30, "height": 30 },
+        "rules": [
+          {
+            "id": "r-002",
+            "name": "Visible when computed value high",
+            "targetProperty": "visible",
+            "pvs": [
+              { "name": "fox://f-001", "trigger": true },
+              { "name": "${P}:THRESHOLD", "trigger": true }
+            ],
+            "conditions": [{ "expression": "{0} > {1}", "value": false }],
+            "default": true
+          }
+        ]
+      }
+    ]
+  }
+}

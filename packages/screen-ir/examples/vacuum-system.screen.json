@@ -1,0 +1,63 @@
+{
+  "schemaVersion": "1.0",
+  "kind": "screen",
+  "id": "vacuum-system",
+  "metadata": {
+    "title": "Vacuum System",
+    "source": { "type": "screen-builder", "savedAt": "2026-06-19T10:00:00Z" },
+    "size": { "width": 800, "height": 600 }
+  },
+  "macros": [
+    { "name": "PREFIX", "default": "DEMO:VAC1", "description": "Device prefix" },
+    { "name": "DEVICE", "default": "Q1" }
+  ],
+  "root": {
+    "id": "w-001",
+    "type": "absolute-canvas",
+    "props": { "width": 800, "height": 600 },
+    "geometry": { "x": 0, "y": 0, "width": 800, "height": 600 },
+    "children": [
+      {
+        "id": "w-002",
+        "type": "pv-label",
+        "props": {
+          "pv": "${PREFIX}:PRESSURE",
+          "precision": "fromPV",
+          "alarmSensitive": true,
+          "alarmBorder": true
+        },
+        "geometry": { "x": 10, "y": 20, "width": 200, "height": 30 },
+        "rules": [
+          {
+            "id": "r-001",
+            "name": "Border color from severity",
+            "targetProperty": "alarmBorder",
+            "pvs": [{ "name": "${PREFIX}:STATUS:SEV", "trigger": true }],
+            "conditions": [{ "expression": "{0} > 1", "value": true }],
+            "default": false
+          }
+        ],
+        "meta": { "comment": "Primary pressure readout — DO NOT MOVE" }
+      },
+      {
+        "id": "w-003",
+        "type": "pv-slider",
+        "props": {
+          "pv": "${PREFIX}:SETPOINT",
+          "min": 0,
+          "max": 100
+        },
+        "geometry": { "x": 10, "y": 60, "width": 200, "height": 40 }
+      },
+      {
+        "id": "w-004",
+        "type": "embedded-display",
+        "props": {
+          "file": "motor-control.screen.json",
+          "macros": { "MOTOR": "${PREFIX}:M1" }
+        },
+        "geometry": { "x": 250, "y": 20, "width": 400, "height": 200 }
+      }
+    ]
+  }
+}
