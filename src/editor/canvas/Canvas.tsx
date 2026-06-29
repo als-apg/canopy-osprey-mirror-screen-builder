@@ -15,6 +15,8 @@ export function Canvas() {
   const mode = useEditorStore((s) => s.mode);
   const setZoom = useEditorStore((s) => s.setZoom);
   const setPan = useEditorStore((s) => s.setPan);
+  const screenLoadId = useEditorStore((s) => s.screenLoadId);
+  const fitNonce = useEditorStore((s) => s.fitNonce);
   const selectWidgets = useEditorStore((s) => s.selectWidgets);
   const clearSelection = useEditorStore((s) => s.clearSelection);
   const moveWidgets = useEditorStore((s) => s.moveWidgets);
@@ -84,6 +86,37 @@ export function Canvas() {
     },
     [viewport]
   );
+
+  // ── Fit to screen ─────────────────────────────────────────────────────────
+
+  // Pick the zoom that makes the whole screen fit inside the container (minus
+  // the VIEWPORT_OFFSET inset), then reset pan to the top-left. Never upscales
+  // past 100% — small screens stay at their native size.
+  const fitToScreen = useCallback(() => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const z = Math.min(
+      (rect.width - VIEWPORT_OFFSET * 2) / screen.meta.width,
+      (rect.height - VIEWPORT_OFFSET * 2) / screen.meta.height,
+      1
+    );
+    setZoom(z);
+    setPan(0, 0);
+  }, [screen.meta.width, screen.meta.height, setZoom, setPan]);
+
+  // Auto-fit whenever a new screen is loaded (import / open / new).
+  useEffect(() => {
+    fitToScreen();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screenLoadId]);
+
+  // Fit on demand when the toolbar's Fit-to-Screen button bumps the nonce.
+  // Skip the initial mount (nonce 0) so it doesn't fight the load fit above.
+  useEffect(() => {
+    if (fitNonce === 0) return;
+    fitToScreen();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fitNonce]);
 
   // ── Mouse handling ──────────────────────────────────────────────────────
 

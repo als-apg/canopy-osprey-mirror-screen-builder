@@ -210,6 +210,12 @@ interface EditorState {
   // Viewport
   viewport: ViewportState;
 
+  // Bumped whenever a new screen is loaded wholesale (import/open/new); the
+  // canvas watches this to auto-fit zoom. `fitNonce` is bumped by the toolbar's
+  // Fit-to-Screen button — same fit code path, on demand.
+  screenLoadId: number;
+  fitNonce: number;
+
   // Panels
   panels: PanelState;
 
@@ -268,7 +274,7 @@ interface EditorActions {
   // Viewport
   setZoom(zoom: number): void;
   setPan(x: number, y: number): void;
-  zoomToFit(): void;
+  requestFit(): void;
 
   // Panels
   togglePanel(panel: BooleanPanelKey): void;
@@ -327,6 +333,8 @@ export const useEditorStore = create<EditorStore>()(
     importError: null,
     selection: { selectedIds: [], hoveredId: null },
     viewport: { zoom: 1, panX: 0, panY: 0 },
+    screenLoadId: 0,
+    fitNonce: 0,
     panels: DEFAULT_PANELS,
     mode: 'edit',
     editorTheme: 'g90',
@@ -346,6 +354,7 @@ export const useEditorStore = create<EditorStore>()(
         s.selection.selectedIds = [];
         s.undoStack = [];
         s.redoStack = [];
+        s.screenLoadId += 1;
       });
     },
 
@@ -665,12 +674,11 @@ export const useEditorStore = create<EditorStore>()(
       });
     },
 
-    zoomToFit() {
-      // Will be implemented once we have canvas container dimensions
+    requestFit() {
+      // The fit math needs the canvas container's pixel size, which lives in
+      // the Canvas component. Bump the nonce; the canvas watches it and fits.
       set((s) => {
-        s.viewport.zoom = 1;
-        s.viewport.panX = 0;
-        s.viewport.panY = 0;
+        s.fitNonce += 1;
       });
     },
 
@@ -803,6 +811,7 @@ export const useEditorStore = create<EditorStore>()(
           s.redoStack = [];
           s.lastImportReport = imported.report;
           s.importError = null;
+          s.screenLoadId += 1;
         });
         return;
       }
@@ -815,6 +824,7 @@ export const useEditorStore = create<EditorStore>()(
         s.selection.selectedIds = [];
         s.undoStack = [];
         s.redoStack = [];
+        s.screenLoadId += 1;
       });
     },
 
@@ -862,6 +872,7 @@ export const useEditorStore = create<EditorStore>()(
         s.redoStack = [];
         s.lastImportReport = imported.report;
         s.importError = null;
+        s.screenLoadId += 1;
       });
     },
 

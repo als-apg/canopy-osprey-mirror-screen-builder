@@ -38,7 +38,7 @@ export function Toolbar() {
   const paste = useEditorStore((s) => s.paste);
   const deleteSelection = useEditorStore((s) => s.deleteSelection);
   const setZoom = useEditorStore((s) => s.setZoom);
-  const zoomToFit = useEditorStore((s) => s.zoomToFit);
+  const requestFit = useEditorStore((s) => s.requestFit);
   const viewport = useEditorStore((s) => s.viewport);
   const screen = useEditorStore((s) => s.screen);
   const updateScreenMeta = useEditorStore((s) => s.updateScreenMeta);
@@ -83,6 +83,7 @@ export function Toolbar() {
           renderIcon={DocumentAdd}
           iconDescription="New Screen"
           tooltipPosition="bottom"
+          tooltipAlignment="start"
           onClick={() => {
             if (isDirty && !confirm('Discard unsaved changes?')) return;
             setScreen(createDefaultScreen());
@@ -95,6 +96,7 @@ export function Toolbar() {
           renderIcon={FolderOpen}
           iconDescription="Open File"
           tooltipPosition="bottom"
+          tooltipAlignment="start"
           onClick={openFile}
         />
         <Button
@@ -104,6 +106,7 @@ export function Toolbar() {
           renderIcon={DocumentImport}
           iconDescription="Import legacy screen (.edl/.ui)"
           tooltipPosition="bottom"
+          tooltipAlignment="start"
           onClick={() => {
             if (isDirty && !confirm('Discard unsaved changes?')) return;
             void importLegacyScreen();
@@ -242,7 +245,7 @@ export function Toolbar() {
           renderIcon={FitToScreen}
           iconDescription="Fit to Screen"
           tooltipPosition="bottom"
-          onClick={zoomToFit}
+          onClick={requestFit}
         />
       </div>
 
