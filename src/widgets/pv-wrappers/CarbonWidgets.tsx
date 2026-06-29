@@ -13,6 +13,7 @@ import { usePV } from '../../hooks/usePV';
 import { alarmBorderStyle } from '../../theme/alarm';
 import { AlarmSeverity, AlarmSeverityName } from '../../types/widget';
 import type { WidgetRendererProps } from '../registry/WidgetRegistry';
+import { useFitText } from '../shared/useFitText';
 import './CarbonWidgets.scss';
 
 /** PVTextDisplay — Carbon Tag/Text showing live PV value */
@@ -22,6 +23,17 @@ export function CarbonPVTextDisplay({ layout, props, isSelected }: WidgetRendere
     pv.severity,
     (props.alarmSensitiveBorder as boolean) ?? true
   );
+
+  const label = props.label as string | undefined;
+  const value = pv.connected ? pv.displayValue : '---';
+  // Default ~13px matches the .carbon-pv-display__value rule (0.8125rem).
+  const maxFontSize = (props.fontSize as number) ?? 13;
+  const { ref, fontSize } = useFitText<HTMLDivElement>(maxFontSize, [
+    label,
+    value,
+    layout.width,
+    layout.height,
+  ]);
 
   const severityTag = (() => {
     switch (pv.severity) {
@@ -47,8 +59,10 @@ export function CarbonPVTextDisplay({ layout, props, isSelected }: WidgetRendere
         ...alarmBorder,
       }}
     >
-      {props.label && <span className="carbon-pv-display__label">{props.label as string}</span>}
-      <span className="carbon-pv-display__value">{pv.connected ? pv.displayValue : '---'}</span>
+      <div ref={ref} className="carbon-pv-display__content" style={{ fontSize }}>
+        {label && <span className="carbon-pv-display__label">{label}</span>}
+        <span className="carbon-pv-display__value">{value}</span>
+      </div>
       {pv.connected && pv.severity !== AlarmSeverity.NO_ALARM && (
         <Tag size="sm" type={severityTag} className="carbon-pv-display__alarm-tag">
           {AlarmSeverityName[pv.severity]}
@@ -113,6 +127,13 @@ export function CarbonPVTextInput({
 /** PVButton — Carbon Button that writes to PV */
 export function CarbonPVButton({ layout, props, isEditing }: WidgetRendererProps) {
   const pv = usePV(props.pvName as string | undefined);
+  const label = (props.label as string) ?? 'Button';
+  const maxFontSize = (props.fontSize as number) ?? 14;
+  const { ref, fontSize } = useFitText<HTMLSpanElement>(maxFontSize, [
+    label,
+    layout.width,
+    layout.height,
+  ]);
 
   const handleClick = useCallback(() => {
     if (!isEditing && pv.connected && props.pressValue !== undefined) {
@@ -121,7 +142,7 @@ export function CarbonPVButton({ layout, props, isEditing }: WidgetRendererProps
   }, [isEditing, pv, props.pressValue]);
 
   return (
-    <div style={{ width: layout.width, height: layout.height }}>
+    <div style={{ width: layout.width, height: layout.height, overflow: 'hidden' }}>
       <Button
         size="sm"
         kind="primary"
@@ -130,7 +151,19 @@ export function CarbonPVButton({ layout, props, isEditing }: WidgetRendererProps
         className="carbon-pv-button"
         style={{ width: '100%', height: '100%', maxWidth: 'none' }}
       >
-        {(props.label as string) ?? 'Button'}
+        <span
+          ref={ref}
+          style={{
+            display: 'block',
+            fontSize,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            maxWidth: '100%',
+          }}
+        >
+          {label}
+        </span>
       </Button>
     </div>
   );

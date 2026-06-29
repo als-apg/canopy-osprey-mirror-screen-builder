@@ -15,6 +15,7 @@ import {
 } from '../pv-wrappers/CarbonWidgets';
 import { LineWidget } from '../drawing/LineWidget';
 import { ScreenImageWidget } from '../drawing/ScreenImageWidget';
+import { useFitText } from '../shared/useFitText';
 
 // ── Shared prop schemas ─────────────────────────────────────────────────────
 
@@ -85,21 +86,41 @@ function EllipseWidget({ layout, props, isSelected, children }: WidgetRendererPr
 }
 
 function StaticLabelWidget({ layout, props, isSelected }: WidgetRendererProps) {
+  const text = (props.text as string) ?? 'Label';
+  const maxFontSize = (props.fontSize as number) ?? 14;
+  const { ref, fontSize } = useFitText<HTMLSpanElement>(maxFontSize, [
+    text,
+    layout.width,
+    layout.height,
+  ]);
+
   return (
     <div
       style={{
         width: layout.width,
         height: layout.height,
         color: props.foregroundColor ?? '#f4f4f4',
-        fontSize: props.fontSize ?? 14,
         display: 'flex',
         alignItems: 'center',
         padding: '0 4px',
         outline: isSelected ? '1px solid #0f62fe' : 'none',
         userSelect: 'none',
+        overflow: 'hidden',
+        boxSizing: 'border-box',
       }}
     >
-      {props.text ?? 'Label'}
+      <span
+        ref={ref}
+        style={{
+          fontSize,
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          maxWidth: '100%',
+        }}
+      >
+        {text}
+      </span>
     </div>
   );
 }
