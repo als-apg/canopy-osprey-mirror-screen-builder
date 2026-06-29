@@ -762,7 +762,15 @@ export const useEditorStore = create<EditorStore>()(
 
     async saveToFile() {
       const state = get();
-      const suggestedName = state.filePath?.split(/[/\\]/).pop() ?? 'screen.tsx';
+      // Save always writes TSX (generateTSX), so the suggested name must end in
+      // .tsx — even when filePath was inherited from a legacy import, which sets
+      // it to `.screen.json`. Otherwise we'd write TSX bytes into a .json file
+      // that the .screen.json-routed importer then fails to JSON.parse on open.
+      const base = (state.filePath?.split(/[/\\]/).pop() ?? 'screen.tsx').replace(
+        /\.(screen\.json|json|tsx|ts|jsx)$/i,
+        ''
+      );
+      const suggestedName = `${base || 'screen'}.tsx`;
       const result = await writeTSX(generateTSX(state.screen), suggestedName);
       if (!result) return;
       set((s) => {

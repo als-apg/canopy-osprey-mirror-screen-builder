@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { useEditorStore } from './EditorStore';
 import type { ScreenModel, Widget } from '../../types/widget';
 import { createDefaultScreen } from '../../types/widget';
@@ -63,5 +63,45 @@ describe('moveWidgets', () => {
     expect(at('a')).toMatchObject({ x: 115, y: 115 });
     expect(at('group')).toMatchObject({ x: 100, y: 100 });
     expect(at('b')).toMatchObject({ x: 160, y: 110 });
+  });
+});
+
+describe('saveToFile name suggestion', () => {
+  let suggestedName: string | undefined;
+
+  beforeEach(() => {
+    suggestedName = undefined;
+    // Capture the name the save picker is asked for, and no-op the write.
+    (window as unknown as { showSaveFilePicker: unknown }).showSaveFilePicker = vi.fn(
+      async (opts: { suggestedName?: string }) => {
+        suggestedName = opts.suggestedName;
+        return {
+          name: opts.suggestedName ?? '',
+          createWritable: async () => ({ write: async () => {}, close: async () => {} }),
+        };
+      }
+    );
+  });
+
+  afterEach(() => {
+    delete (window as unknown as { showSaveFilePicker?: unknown }).showSaveFilePicker;
+  });
+
+  it('suggests .tsx even when filePath is a .screen.json from a legacy import', async () => {
+    useEditorStore.getState().setFilePath('vac_li04_VP.screen.json');
+    await useEditorStore.getState().saveToFile();
+    expect(suggestedName).toBe('vac_li04_VP.tsx');
+  });
+
+  it('keeps a .tsx filePath as .tsx', async () => {
+    useEditorStore.getState().setFilePath('my_screen.tsx');
+    await useEditorStore.getState().saveToFile();
+    expect(suggestedName).toBe('my_screen.tsx');
+  });
+
+  it('falls back to screen.tsx when no filePath is set', async () => {
+    useEditorStore.getState().setFilePath(null);
+    await useEditorStore.getState().saveToFile();
+    expect(suggestedName).toBe('screen.tsx');
   });
 });
