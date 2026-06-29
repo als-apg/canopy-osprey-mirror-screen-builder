@@ -11,10 +11,13 @@ import {
   CarbonPVToggle,
   CarbonPVProgressBar,
   CarbonPVDropdown,
+  CarbonPVCheckbox,
+  CarbonPVByteIndicator,
 } from '../../widgets/pv-wrappers/CarbonWidgets';
 import { BreakpointBar } from './BreakpointBar';
 import type { WidgetRendererProps } from '../../widgets/registry/WidgetRegistry';
-import type { WidgetType } from '../../types/widget';
+import type { WidgetType, Widget } from '../../types/widget';
+import type { ReactNode } from 'react';
 import './LivePreview.scss';
 
 // Map widget types to Carbon live components
@@ -27,6 +30,8 @@ const LIVE_COMPONENTS: Partial<Record<WidgetType, React.ComponentType<WidgetRend
   PVToggle: CarbonPVToggle,
   PVProgressBar: CarbonPVProgressBar,
   PVDropdown: CarbonPVDropdown,
+  PVCheckbox: CarbonPVCheckbox,
+  PVByteIndicator: CarbonPVByteIndicator,
 };
 
 export function LivePreview() {
@@ -47,9 +52,66 @@ export function LivePreview() {
     return str.replace(/\$\((\w+)\)/g, (_, key) => macros[key] ?? `$(${key})`);
   };
 
-  const sortedWidgets = screen.rootWidgetIds
+  // Recursively render a widget and its descendants. Geometry is stored
+  // absolute (the IR contract); children render nested in the parent wrapper,
+  // so the parent's absolute origin is subtracted to cancel the nesting offset
+  // (mirrors the canvas renderer). `seen` guards a parentId cycle.
+  const renderWidget = (
+    widget: Widget,
+    seen: Set<string>,
+    parentOrigin?: { x: number; y: number }
+  ): ReactNode => {
+    if (!widget.visible || seen.has(widget.id)) return null;
+
+    const LiveComponent = LIVE_COMPONENTS[widget.type];
+    const FallbackComponent = widgetRegistry.get(widget.type)?.component;
+    const Component = LiveComponent ?? FallbackComponent;
+    if (!Component) return null;
+
+    // Resolve PV name macros
+    const resolvedProps = { ...widget.props };
+    if (resolvedProps.pvName) {
+      resolvedProps.pvName = resolveMacros(resolvedProps.pvName as string);
+    }
+
+    const nextSeen = new Set(seen).add(widget.id);
+    const origin = { x: widget.layout.x, y: widget.layout.y };
+    const childNodes = (widget.children ?? [])
+      .map((id) => screen.widgets[id])
+      .filter(Boolean)
+      .sort((a, b) => a.zIndex - b.zIndex)
+      .map((child) => renderWidget(child, nextSeen, origin));
+
+    return (
+      <div
+        key={widget.id}
+        style={{
+          position: 'absolute',
+          left: widget.layout.x - (parentOrigin?.x ?? 0),
+          top: widget.layout.y - (parentOrigin?.y ?? 0),
+          width: widget.layout.width,
+          height: widget.layout.height,
+          zIndex: widget.zIndex,
+          transform: widget.rotation ? `rotate(${widget.rotation}deg)` : undefined,
+        }}
+      >
+        <Component
+          id={widget.id}
+          type={widget.type}
+          layout={widget.layout}
+          props={resolvedProps}
+          isSelected={false}
+          isEditing={false}
+        >
+          {childNodes.length > 0 ? childNodes : undefined}
+        </Component>
+      </div>
+    );
+  };
+
+  const rootWidgets = screen.rootWidgetIds
     .map((id) => screen.widgets[id])
-    .filter((w) => w && w.visible)
+    .filter(Boolean)
     .sort((a, b) => a.zIndex - b.zIndex);
 
   // Calculate preview width
@@ -119,43 +181,7 @@ export function LivePreview() {
               transformOrigin: 'top left',
             }}
           >
-            {sortedWidgets.map((widget) => {
-              // Resolve PV name macros
-              const resolvedProps = { ...widget.props };
-              if (resolvedProps.pvName) {
-                resolvedProps.pvName = resolveMacros(resolvedProps.pvName as string);
-              }
-
-              const LiveComponent = LIVE_COMPONENTS[widget.type];
-              const FallbackComponent = widgetRegistry.get(widget.type)?.component;
-              const Component = LiveComponent ?? FallbackComponent;
-
-              if (!Component) return null;
-
-              return (
-                <div
-                  key={widget.id}
-                  style={{
-                    position: 'absolute',
-                    left: widget.layout.x,
-                    top: widget.layout.y,
-                    width: widget.layout.width,
-                    height: widget.layout.height,
-                    zIndex: widget.zIndex,
-                    transform: widget.rotation ? `rotate(${widget.rotation}deg)` : undefined,
-                  }}
-                >
-                  <Component
-                    id={widget.id}
-                    type={widget.type}
-                    layout={widget.layout}
-                    props={resolvedProps}
-                    isSelected={false}
-                    isEditing={false}
-                  />
-                </div>
-              );
-            })}
+            {rootWidgets.map((widget) => renderWidget(widget, new Set()))}
           </div>
         </div>
       </div>

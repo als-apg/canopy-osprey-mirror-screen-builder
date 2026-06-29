@@ -9,6 +9,14 @@ interface WidgetOverlayProps {
   onHover: () => void;
   onHoverEnd: () => void;
   children: ReactNode;
+  /**
+   * Absolute origin of the immediate parent container, subtracted from this
+   * widget's absolute `layout` so it positions correctly inside the parent's
+   * box. Widget geometry is stored absolute (the IR contract), but child
+   * overlays render *nested* in the parent's DOM, so the parent's offset must
+   * be cancelled out. Omitted (0,0) for top-level widgets.
+   */
+  parentOrigin?: { x: number; y: number };
 }
 
 export function WidgetOverlay({
@@ -18,8 +26,11 @@ export function WidgetOverlay({
   onHover,
   onHoverEnd,
   children,
+  parentOrigin,
 }: WidgetOverlayProps) {
-  const { x, y, width, height } = widget.layout;
+  const { width, height } = widget.layout;
+  const x = widget.layout.x - (parentOrigin?.x ?? 0);
+  const y = widget.layout.y - (parentOrigin?.y ?? 0);
 
   return (
     <div

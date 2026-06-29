@@ -460,16 +460,34 @@ export const useEditorStore = create<EditorStore>()(
 
     moveWidgets(ids, dx, dy) {
       set((s) => {
-        for (const id of ids) {
+        // Geometry is stored absolute, so moving a container must explicitly
+        // carry its whole subtree (descendants hold their own absolute coords).
+        // Collect each selected widget plus all descendants, deduped — a widget
+        // selected both directly and via an ancestor moves only once.
+        const toMove = new Set<string>();
+        const collect = (id: string) => {
+          if (toMove.has(id)) return;
           const w = s.screen.widgets[id];
-          if (w) {
-            w.layout.x += dx;
-            w.layout.y += dy;
-            if (s.screen.meta.snapToGrid) {
-              const g = s.screen.meta.gridSize;
-              w.layout.x = Math.round(w.layout.x / g) * g;
-              w.layout.y = Math.round(w.layout.y / g) * g;
-            }
+          if (!w) return;
+          toMove.add(id);
+          for (const cid of w.children ?? []) collect(cid);
+        };
+        for (const id of ids) collect(id);
+
+        // Snap-to-grid is applied only to the dragged (top-level selected)
+        // widgets; descendants shift by the same raw delta to preserve their
+        // offset within the container.
+        const snap = s.screen.meta.snapToGrid;
+        const g = s.screen.meta.gridSize;
+        const selected = new Set(ids);
+        for (const id of toMove) {
+          const w = s.screen.widgets[id];
+          if (!w) continue;
+          w.layout.x += dx;
+          w.layout.y += dy;
+          if (snap && selected.has(id)) {
+            w.layout.x = Math.round(w.layout.x / g) * g;
+            w.layout.y = Math.round(w.layout.y / g) * g;
           }
         }
         s.isDirty = true;

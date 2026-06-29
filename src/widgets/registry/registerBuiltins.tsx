@@ -9,8 +9,12 @@ import {
   CarbonPVToggle,
   CarbonPVProgressBar,
   CarbonPVLed,
+  CarbonPVDropdown,
+  CarbonPVCheckbox,
+  CarbonPVByteIndicator,
 } from '../pv-wrappers/CarbonWidgets';
 import { LineWidget } from '../drawing/LineWidget';
+import { ScreenImageWidget } from '../drawing/ScreenImageWidget';
 
 // ── Shared prop schemas ─────────────────────────────────────────────────────
 
@@ -41,7 +45,12 @@ const appearanceSchemas: PropSchema[] = [
   },
 ];
 
-function RectangleWidget({ layout, props, isSelected }: WidgetRendererProps) {
+// NOTE: containers render `children` (nested widget overlays from the canvas's
+// recursive renderer). Children are absolutely positioned against this box, so
+// do NOT add `overflow: hidden` here or to `.widget-overlay` — the imported Qt
+// `centralwidget` arrives as a 0×0 Rectangle wrapper, and clipping would make
+// every nested widget invisible again (the bug this whole change fixes).
+function RectangleWidget({ layout, props, isSelected, children }: WidgetRendererProps) {
   return (
     <div
       style={{
@@ -52,11 +61,13 @@ function RectangleWidget({ layout, props, isSelected }: WidgetRendererProps) {
         borderRadius: props.cornerRadius ?? 0,
         outline: isSelected ? '2px solid #0f62fe' : 'none',
       }}
-    />
+    >
+      {children}
+    </div>
   );
 }
 
-function EllipseWidget({ layout, props, isSelected }: WidgetRendererProps) {
+function EllipseWidget({ layout, props, isSelected, children }: WidgetRendererProps) {
   return (
     <div
       style={{
@@ -67,7 +78,9 @@ function EllipseWidget({ layout, props, isSelected }: WidgetRendererProps) {
         borderRadius: '50%',
         outline: isSelected ? '2px solid #0f62fe' : 'none',
       }}
-    />
+    >
+      {children}
+    </div>
   );
 }
 
@@ -91,7 +104,7 @@ function StaticLabelWidget({ layout, props, isSelected }: WidgetRendererProps) {
   );
 }
 
-function GroupWidget({ layout, isSelected }: WidgetRendererProps) {
+function GroupWidget({ layout, isSelected, children }: WidgetRendererProps) {
   return (
     <div
       style={{
@@ -101,7 +114,9 @@ function GroupWidget({ layout, isSelected }: WidgetRendererProps) {
         borderRadius: 2,
         backgroundColor: 'transparent',
       }}
-    />
+    >
+      {children}
+    </div>
   );
 }
 
@@ -221,6 +236,36 @@ export function registerBuiltinWidgets() {
     ],
   });
 
+  widgetRegistry.register({
+    type: 'PVDropdown',
+    label: 'Dropdown',
+    category: 'input',
+    icon: 'ListDropdown',
+    defaultLayout: { x: 0, y: 0, width: 160, height: 40 },
+    defaultProps: {},
+    component: CarbonPVDropdown,
+    propsSchema: [
+      pvSchema,
+      { key: 'label', label: 'Label', type: 'string', section: 'display' },
+      ...alarmSchemas,
+    ],
+  });
+
+  widgetRegistry.register({
+    type: 'PVCheckbox',
+    label: 'Checkbox',
+    category: 'input',
+    icon: 'Checkbox',
+    defaultLayout: { x: 0, y: 0, width: 140, height: 32 },
+    defaultProps: { label: 'Enable' },
+    component: CarbonPVCheckbox,
+    propsSchema: [
+      pvSchema,
+      { key: 'label', label: 'Label', type: 'string', section: 'display' },
+      ...alarmSchemas,
+    ],
+  });
+
   // Indicators
   widgetRegistry.register({
     type: 'PVLed',
@@ -253,6 +298,31 @@ export function registerBuiltinWidgets() {
       { key: 'maxValue', label: 'Max', type: 'number', section: 'behavior' },
       ...alarmSchemas,
       ...appearanceSchemas,
+    ],
+  });
+
+  widgetRegistry.register({
+    type: 'PVByteIndicator',
+    label: 'Byte Indicator',
+    category: 'indicator',
+    icon: 'Bat',
+    defaultLayout: { x: 0, y: 0, width: 160, height: 24 },
+    defaultProps: {
+      numBits: 8,
+      startBit: 0,
+      bigEndian: false,
+      onColor: '#24a148',
+      offColor: '#525252',
+    },
+    component: CarbonPVByteIndicator,
+    propsSchema: [
+      pvSchema,
+      { key: 'numBits', label: 'Num Bits', type: 'number', section: 'behavior', min: 1, max: 32 },
+      { key: 'startBit', label: 'Start Bit', type: 'number', section: 'behavior', min: 0, max: 31 },
+      { key: 'bigEndian', label: 'Big Endian', type: 'boolean', section: 'behavior' },
+      { key: 'onColor', label: 'On Color', type: 'color', section: 'appearance' },
+      { key: 'offColor', label: 'Off Color', type: 'color', section: 'appearance' },
+      ...alarmSchemas,
     ],
   });
 
@@ -381,6 +451,31 @@ export function registerBuiltinWidgets() {
     propsSchema: [
       { key: 'text', label: 'Text', type: 'string', section: 'display' },
       ...appearanceSchemas,
+    ],
+  });
+
+  widgetRegistry.register({
+    type: 'ScreenImage',
+    label: 'Image',
+    category: 'drawing',
+    icon: 'Image',
+    defaultLayout: { x: 0, y: 0, width: 120, height: 120 },
+    defaultProps: { stretchMode: 'fit' },
+    component: ScreenImageWidget,
+    propsSchema: [
+      { key: 'filename', label: 'Filename', type: 'string', section: 'display' },
+      {
+        key: 'stretchMode',
+        label: 'Stretch Mode',
+        type: 'select',
+        section: 'appearance',
+        options: [
+          { label: 'None', value: 'none' },
+          { label: 'Fit', value: 'fit' },
+          { label: 'Fill', value: 'fill' },
+          { label: 'Stretch', value: 'stretch' },
+        ],
+      },
     ],
   });
 

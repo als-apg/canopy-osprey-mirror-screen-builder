@@ -1,5 +1,14 @@
 import { useState, useCallback } from 'react';
-import { TextInput, Button, Slider, Toggle, ProgressBar, Tag, Dropdown } from '@carbon/react';
+import {
+  TextInput,
+  Button,
+  Slider,
+  Toggle,
+  ProgressBar,
+  Tag,
+  Dropdown,
+  Checkbox,
+} from '@carbon/react';
 import { usePV } from '../../hooks/usePV';
 import { alarmBorderStyle } from '../../theme/alarm';
 import { AlarmSeverity, AlarmSeverityName } from '../../types/widget';
@@ -280,6 +289,88 @@ export function CarbonPVDropdown({ id, layout, props, isEditing }: WidgetRendere
           if (!isEditing && selectedItem) pv.put(selectedItem);
         }}
       />
+    </div>
+  );
+}
+
+/** PVCheckbox — Carbon Checkbox bound to PV (writes 1/0) */
+export function CarbonPVCheckbox({ id, layout, props, isEditing }: WidgetRendererProps) {
+  const pv = usePV(props.pvName as string | undefined);
+  const isChecked =
+    pv.connected && (typeof pv.value === 'number' ? pv.value !== 0 : Boolean(pv.value));
+
+  const handleChange = useCallback(
+    (_: unknown, { checked }: { checked: boolean }) => {
+      if (!isEditing) pv.put(checked ? 1 : 0);
+    },
+    [isEditing, pv]
+  );
+
+  return (
+    <div
+      style={{ width: layout.width, height: layout.height, display: 'flex', alignItems: 'center' }}
+    >
+      <Checkbox
+        id={`pv-checkbox-${id}`}
+        labelText={(props.label as string) ?? ''}
+        checked={isChecked}
+        onChange={handleChange}
+        disabled={!pv.connected && !!props.pvName}
+        readOnly={isEditing}
+      />
+    </div>
+  );
+}
+
+/** PVByteIndicator — a row of LED dots, one per bit of the PV value */
+export function CarbonPVByteIndicator({ layout, props }: WidgetRendererProps) {
+  const pv = usePV(props.pvName as string | undefined);
+  const value = pv.connected && typeof pv.value === 'number' ? pv.value : 0;
+  const numBits = Math.max(1, (props.numBits as number) ?? 8);
+  const startBit = (props.startBit as number) ?? 0;
+  const bigEndian = (props.bigEndian as boolean) ?? false;
+  const onColor = (props.onColor as string) ?? '#24a148';
+  const offColor = (props.offColor as string) ?? '#525252';
+
+  // Each cell is a square sized to the row height; lay them out left→right.
+  const size = Math.min(layout.height, layout.width / numBits);
+
+  const bits = Array.from({ length: numBits }, (_, i) => {
+    // Bit 0 is the LSB. bigEndian renders the high bit first (leftmost).
+    const bitIndex = bigEndian ? numBits - 1 - i : i;
+    return (value >> (startBit + bitIndex)) & 1;
+  });
+
+  return (
+    <div
+      className="carbon-pv-byte"
+      style={{
+        width: layout.width,
+        height: layout.height,
+        display: 'flex',
+        gap: 2,
+        alignItems: 'center',
+      }}
+    >
+      {bits.map((on, i) => {
+        const color = on ? onColor : offColor;
+        return (
+          <div
+            key={i}
+            style={{
+              width: size,
+              height: size,
+              borderRadius: '50%',
+              backgroundColor: color,
+              boxShadow: on
+                ? `0 0 ${size / 3}px ${color}80, inset 0 -1px 2px rgba(0,0,0,0.3)`
+                : 'inset 0 1px 2px rgba(0,0,0,0.4)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              flex: '0 0 auto',
+            }}
+          />
+        );
+      })}
     </div>
   );
 }
