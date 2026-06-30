@@ -183,6 +183,8 @@ export function LivePreview() {
               position: 'relative',
               transform: screenScale < 1 ? `scale(${screenScale})` : undefined,
               transformOrigin: 'top left',
+              overflowX: screen.meta.showHorizontalScrollbar === false ? 'hidden' : 'auto',
+              overflowY: screen.meta.showVerticalScrollbar === false ? 'hidden' : 'auto',
             }}
           >
             {rootWidgets.map((widget) => renderWidget(widget, new Set()))}

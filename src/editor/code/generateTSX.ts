@@ -137,7 +137,7 @@ function buildPropsString(widget: Widget): string {
     alarmSensitiveBorder: true,
     alarmSensitiveContent: false,
     visible: true,
-    opacity: 1,
+    opacity: 0,
     fill: false,
     orientation: 'horizontal',
     showUnits: false,

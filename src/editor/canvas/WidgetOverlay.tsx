@@ -55,14 +55,38 @@ export function WidgetOverlay({
       {/* Selection handles */}
       {isSelected && (
         <>
-          <div className="widget-overlay__handle widget-overlay__handle--nw" />
-          <div className="widget-overlay__handle widget-overlay__handle--ne" />
-          <div className="widget-overlay__handle widget-overlay__handle--sw" />
-          <div className="widget-overlay__handle widget-overlay__handle--se" />
-          <div className="widget-overlay__handle widget-overlay__handle--n" />
-          <div className="widget-overlay__handle widget-overlay__handle--s" />
-          <div className="widget-overlay__handle widget-overlay__handle--e" />
-          <div className="widget-overlay__handle widget-overlay__handle--w" />
+          <div
+            className="widget-overlay__handle widget-overlay__handle--nw"
+            data-resize-handle="nw"
+          />
+          <div
+            className="widget-overlay__handle widget-overlay__handle--ne"
+            data-resize-handle="ne"
+          />
+          <div
+            className="widget-overlay__handle widget-overlay__handle--sw"
+            data-resize-handle="sw"
+          />
+          <div
+            className="widget-overlay__handle widget-overlay__handle--se"
+            data-resize-handle="se"
+          />
+          <div
+            className="widget-overlay__handle widget-overlay__handle--n"
+            data-resize-handle="n"
+          />
+          <div
+            className="widget-overlay__handle widget-overlay__handle--s"
+            data-resize-handle="s"
+          />
+          <div
+            className="widget-overlay__handle widget-overlay__handle--e"
+            data-resize-handle="e"
+          />
+          <div
+            className="widget-overlay__handle widget-overlay__handle--w"
+            data-resize-handle="w"
+          />
         </>
       )}
 
