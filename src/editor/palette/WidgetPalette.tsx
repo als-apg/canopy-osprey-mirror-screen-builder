@@ -40,6 +40,7 @@ const WIDGET_ICONS: Partial<Record<WidgetType, React.ComponentType<{ size: numbe
   PVSpinbox: CharacterWholeNumber,
   PVToggle: ToggleOff,
   PVLed: CircleFilled,
+  PVByteIndicator: Meter,
   PVProgressBar: ProgressBarRound,
   PVMeter: Meter,
   Rectangle: SquareOutline,

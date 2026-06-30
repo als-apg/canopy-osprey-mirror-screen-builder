@@ -1,9 +1,19 @@
 import { useState, useCallback } from 'react';
-import { TextInput, Button, Slider, Toggle, ProgressBar, Tag, Dropdown } from '@carbon/react';
+import {
+  TextInput,
+  Button,
+  Slider,
+  Toggle,
+  ProgressBar,
+  Tag,
+  Dropdown,
+  Checkbox,
+} from '@carbon/react';
 import { usePV } from '../../hooks/usePV';
 import { alarmBorderStyle } from '../../theme/alarm';
 import { AlarmSeverity, AlarmSeverityName } from '../../types/widget';
 import type { WidgetRendererProps } from '../registry/WidgetRegistry';
+import { useFitText } from '../shared/useFitText';
 import './CarbonWidgets.scss';
 
 /** PVTextDisplay — Carbon Tag/Text showing live PV value */
@@ -13,6 +23,17 @@ export function CarbonPVTextDisplay({ layout, props, isSelected }: WidgetRendere
     pv.severity,
     (props.alarmSensitiveBorder as boolean) ?? true
   );
+
+  const label = props.label as string | undefined;
+  const value = pv.connected ? pv.displayValue : '---';
+  // Default ~13px matches the .carbon-pv-display__value rule (0.8125rem).
+  const maxFontSize = (props.fontSize as number) ?? 13;
+  const { ref, fontSize } = useFitText<HTMLDivElement>(maxFontSize, [
+    label,
+    value,
+    layout.width,
+    layout.height,
+  ]);
 
   const severityTag = (() => {
     switch (pv.severity) {
@@ -38,8 +59,10 @@ export function CarbonPVTextDisplay({ layout, props, isSelected }: WidgetRendere
         ...alarmBorder,
       }}
     >
-      {props.label && <span className="carbon-pv-display__label">{props.label as string}</span>}
-      <span className="carbon-pv-display__value">{pv.connected ? pv.displayValue : '---'}</span>
+      <div ref={ref} className="carbon-pv-display__content" style={{ fontSize }}>
+        {label && <span className="carbon-pv-display__label">{label}</span>}
+        <span className="carbon-pv-display__value">{value}</span>
+      </div>
       {pv.connected && pv.severity !== AlarmSeverity.NO_ALARM && (
         <Tag size="sm" type={severityTag} className="carbon-pv-display__alarm-tag">
           {AlarmSeverityName[pv.severity]}
@@ -104,6 +127,13 @@ export function CarbonPVTextInput({
 /** PVButton — Carbon Button that writes to PV */
 export function CarbonPVButton({ layout, props, isEditing }: WidgetRendererProps) {
   const pv = usePV(props.pvName as string | undefined);
+  const label = (props.label as string) ?? 'Button';
+  const maxFontSize = (props.fontSize as number) ?? 14;
+  const { ref, fontSize } = useFitText<HTMLSpanElement>(maxFontSize, [
+    label,
+    layout.width,
+    layout.height,
+  ]);
 
   const handleClick = useCallback(() => {
     if (!isEditing && pv.connected && props.pressValue !== undefined) {
@@ -112,7 +142,7 @@ export function CarbonPVButton({ layout, props, isEditing }: WidgetRendererProps
   }, [isEditing, pv, props.pressValue]);
 
   return (
-    <div style={{ width: layout.width, height: layout.height }}>
+    <div style={{ width: layout.width, height: layout.height, overflow: 'hidden' }}>
       <Button
         size="sm"
         kind="primary"
@@ -121,7 +151,19 @@ export function CarbonPVButton({ layout, props, isEditing }: WidgetRendererProps
         className="carbon-pv-button"
         style={{ width: '100%', height: '100%', maxWidth: 'none' }}
       >
-        {(props.label as string) ?? 'Button'}
+        <span
+          ref={ref}
+          style={{
+            display: 'block',
+            fontSize,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            maxWidth: '100%',
+          }}
+        >
+          {label}
+        </span>
       </Button>
     </div>
   );
@@ -280,6 +322,88 @@ export function CarbonPVDropdown({ id, layout, props, isEditing }: WidgetRendere
           if (!isEditing && selectedItem) pv.put(selectedItem);
         }}
       />
+    </div>
+  );
+}
+
+/** PVCheckbox — Carbon Checkbox bound to PV (writes 1/0) */
+export function CarbonPVCheckbox({ id, layout, props, isEditing }: WidgetRendererProps) {
+  const pv = usePV(props.pvName as string | undefined);
+  const isChecked =
+    pv.connected && (typeof pv.value === 'number' ? pv.value !== 0 : Boolean(pv.value));
+
+  const handleChange = useCallback(
+    (_: unknown, { checked }: { checked: boolean }) => {
+      if (!isEditing) pv.put(checked ? 1 : 0);
+    },
+    [isEditing, pv]
+  );
+
+  return (
+    <div
+      style={{ width: layout.width, height: layout.height, display: 'flex', alignItems: 'center' }}
+    >
+      <Checkbox
+        id={`pv-checkbox-${id}`}
+        labelText={(props.label as string) ?? ''}
+        checked={isChecked}
+        onChange={handleChange}
+        disabled={!pv.connected && !!props.pvName}
+        readOnly={isEditing}
+      />
+    </div>
+  );
+}
+
+/** PVByteIndicator — a row of LED dots, one per bit of the PV value */
+export function CarbonPVByteIndicator({ layout, props }: WidgetRendererProps) {
+  const pv = usePV(props.pvName as string | undefined);
+  const value = pv.connected && typeof pv.value === 'number' ? pv.value : 0;
+  const numBits = Math.max(1, (props.numBits as number) ?? 8);
+  const startBit = (props.startBit as number) ?? 0;
+  const bigEndian = (props.bigEndian as boolean) ?? false;
+  const onColor = (props.onColor as string) ?? '#24a148';
+  const offColor = (props.offColor as string) ?? '#525252';
+
+  // Each cell is a square sized to the row height; lay them out left→right.
+  const size = Math.min(layout.height, layout.width / numBits);
+
+  const bits = Array.from({ length: numBits }, (_, i) => {
+    // Bit 0 is the LSB. bigEndian renders the high bit first (leftmost).
+    const bitIndex = bigEndian ? numBits - 1 - i : i;
+    return (value >> (startBit + bitIndex)) & 1;
+  });
+
+  return (
+    <div
+      className="carbon-pv-byte"
+      style={{
+        width: layout.width,
+        height: layout.height,
+        display: 'flex',
+        gap: 2,
+        alignItems: 'center',
+      }}
+    >
+      {bits.map((on, i) => {
+        const color = on ? onColor : offColor;
+        return (
+          <div
+            key={i}
+            style={{
+              width: size,
+              height: size,
+              borderRadius: '50%',
+              backgroundColor: color,
+              boxShadow: on
+                ? `0 0 ${size / 3}px ${color}80, inset 0 -1px 2px rgba(0,0,0,0.3)`
+                : 'inset 0 1px 2px rgba(0,0,0,0.4)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              flex: '0 0 auto',
+            }}
+          />
+        );
+      })}
     </div>
   );
 }

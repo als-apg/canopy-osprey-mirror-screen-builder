@@ -10,6 +10,7 @@ import { PropertyInspector } from '../editor/inspector/PropertyInspector';
 import { Canvas } from '../editor/canvas/Canvas';
 import { LivePreview } from '../editor/live/LivePreview';
 import { CodeEditor } from '../editor/code/CodeEditor';
+import { ImportReportModal } from '../editor/import/ImportReportModal';
 import './Shell.scss';
 
 export function Shell() {
@@ -205,6 +206,9 @@ export function Shell() {
               {paletteDrag.type}
             </div>
           )}
+
+          {/* Import diagnostics for the last .screen.json / legacy import */}
+          <ImportReportModal />
         </div>
       </PVServiceProvider>
     </Theme>

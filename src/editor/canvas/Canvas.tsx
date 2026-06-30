@@ -1,5 +1,7 @@
 import { useRef, useCallback, useState, useEffect } from 'react';
+import type { ReactNode } from 'react';
 import { Theme } from '@carbon/react';
+import type { Widget } from '../../types/widget';
 import { useEditorStore } from '../model/EditorStore';
 import { widgetRegistry } from '../../widgets/registry/WidgetRegistry';
 import { WidgetOverlay } from './WidgetOverlay';
@@ -13,6 +15,8 @@ export function Canvas() {
   const mode = useEditorStore((s) => s.mode);
   const setZoom = useEditorStore((s) => s.setZoom);
   const setPan = useEditorStore((s) => s.setPan);
+  const screenLoadId = useEditorStore((s) => s.screenLoadId);
+  const fitNonce = useEditorStore((s) => s.fitNonce);
   const selectWidgets = useEditorStore((s) => s.selectWidgets);
   const clearSelection = useEditorStore((s) => s.clearSelection);
   const moveWidgets = useEditorStore((s) => s.moveWidgets);
@@ -82,6 +86,37 @@ export function Canvas() {
     },
     [viewport]
   );
+
+  // ── Fit to screen ─────────────────────────────────────────────────────────
+
+  // Pick the zoom that makes the whole screen fit inside the container (minus
+  // the VIEWPORT_OFFSET inset), then reset pan to the top-left. Never upscales
+  // past 100% — small screens stay at their native size.
+  const fitToScreen = useCallback(() => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const z = Math.min(
+      (rect.width - VIEWPORT_OFFSET * 2) / screen.meta.width,
+      (rect.height - VIEWPORT_OFFSET * 2) / screen.meta.height,
+      1
+    );
+    setZoom(z);
+    setPan(0, 0);
+  }, [screen.meta.width, screen.meta.height, setZoom, setPan]);
+
+  // Auto-fit whenever a new screen is loaded (import / open / new).
+  useEffect(() => {
+    fitToScreen();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screenLoadId]);
+
+  // Fit on demand when the toolbar's Fit-to-Screen button bumps the nonce.
+  // Skip the initial mount (nonce 0) so it doesn't fight the load fit above.
+  useEffect(() => {
+    if (fitNonce === 0) return;
+    fitToScreen();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fitNonce]);
 
   // ── Mouse handling ──────────────────────────────────────────────────────
 
@@ -202,6 +237,8 @@ export function Canvas() {
       if (marquee && marquee.w > 5 && marquee.h > 5) {
         const ids = Object.values(screen.widgets)
           .filter((w) => {
+            // Widget geometry is stored absolute, so test layout directly
+            // against the screen-space marquee.
             const wx = w.layout.x;
             const wy = w.layout.y;
             const wr = w.layout.x + w.layout.width;
@@ -227,9 +264,58 @@ export function Canvas() {
   const gridSize = screen.meta.gridSize;
   const showGrid = screen.meta.showGrid;
 
-  // ── Sort widgets by z-index ───────────────────────────────────────────────
+  // ── Recursive widget rendering ────────────────────────────────────────────
 
-  const sortedWidgets = screen.rootWidgetIds
+  // Render a widget and its descendants. Widget geometry is stored ABSOLUTE
+  // (the IR contract), but children render *inside* the parent's component
+  // (via the `children` slot), so the parent's absolute origin is subtracted
+  // (`parentOrigin`) to cancel the DOM nesting offset. Rendering them nested —
+  // rather than flat — means a moved/clipped container governs its subtree.
+  // z-index is sorted per level (siblings only). `seen` guards a malformed
+  // parentId/children cycle.
+  const renderWidget = (
+    widget: Widget,
+    seen: Set<string>,
+    parentOrigin?: { x: number; y: number }
+  ): ReactNode => {
+    const def = widgetRegistry.get(widget.type);
+    if (!def || !widget.visible || seen.has(widget.id)) return null;
+    const Component = def.component;
+    const isSelected = selection.selectedIds.includes(widget.id);
+
+    seen.add(widget.id);
+    const origin = { x: widget.layout.x, y: widget.layout.y };
+    const childNodes = (widget.children ?? [])
+      .map((id) => screen.widgets[id])
+      .filter(Boolean)
+      .sort((a, b) => a.zIndex - b.zIndex)
+      .map((child) => renderWidget(child, seen, origin));
+
+    return (
+      <WidgetOverlay
+        key={widget.id}
+        widget={widget}
+        parentOrigin={parentOrigin}
+        isSelected={isSelected}
+        isHovered={selection.hoveredId === widget.id}
+        onHover={() => setHovered(widget.id)}
+        onHoverEnd={() => setHovered(null)}
+      >
+        <Component
+          id={widget.id}
+          type={widget.type}
+          layout={widget.layout}
+          props={widget.props}
+          isSelected={isSelected}
+          isEditing={mode === 'edit'}
+        >
+          {childNodes.length > 0 ? childNodes : undefined}
+        </Component>
+      </WidgetOverlay>
+    );
+  };
+
+  const rootWidgets = screen.rootWidgetIds
     .map((id) => screen.widgets[id])
     .filter(Boolean)
     .sort((a, b) => a.zIndex - b.zIndex);
@@ -285,33 +371,8 @@ export function Canvas() {
               </svg>
             )}
 
-            {/* Widgets */}
-            {sortedWidgets.map((widget) => {
-              const def = widgetRegistry.get(widget.type);
-              if (!def || !widget.visible) return null;
-              const Component = def.component;
-              const isSelected = selection.selectedIds.includes(widget.id);
-
-              return (
-                <WidgetOverlay
-                  key={widget.id}
-                  widget={widget}
-                  isSelected={isSelected}
-                  isHovered={selection.hoveredId === widget.id}
-                  onHover={() => setHovered(widget.id)}
-                  onHoverEnd={() => setHovered(null)}
-                >
-                  <Component
-                    id={widget.id}
-                    type={widget.type}
-                    layout={widget.layout}
-                    props={widget.props}
-                    isSelected={isSelected}
-                    isEditing={mode === 'edit'}
-                  />
-                </WidgetOverlay>
-              );
-            })}
+            {/* Widgets (recursive: containers render their children nested) */}
+            {rootWidgets.map((widget) => renderWidget(widget, new Set()))}
 
             {/* Marquee */}
             {marquee && <SelectionMarquee rect={marquee} />}

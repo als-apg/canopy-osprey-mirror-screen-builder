@@ -12,6 +12,12 @@ import type {
 import { createDefaultScreen } from '../../types/widget';
 import { generateTSX } from '../code/generateTSX';
 import { parseTSX } from '../code/parseTSX';
+import {
+  importScreenJSON,
+  ImportValidationError,
+  type ImportReport,
+} from '../import/importScreenJSON';
+import { convertScreen, ConverterError } from '../../services/converter/convertScreen';
 
 // Minimal shape of the File System Access API used by save/open. The full
 // types ship with `lib.dom.d.ts` in newer TS releases; this local subset keeps
@@ -72,18 +78,32 @@ async function writeTSX(
   }
 }
 
-/** Reads a TSX file from disk via the picker or a hidden file input. */
-async function readTSX(): Promise<{ name: string; code: string } | null> {
+const OPEN_FILE_TYPES = [
+  {
+    description: 'Screen Files',
+    accept: {
+      'text/typescript': ['.tsx', '.ts', '.jsx'],
+      'application/json': ['.json'],
+    },
+  },
+];
+
+/**
+ * Reads a screen file from disk via the picker or a hidden file input.
+ * Accepts both TSX screens and `.screen.json` IR documents; the caller routes
+ * by name/content.
+ */
+async function readScreenFile(): Promise<{ name: string; code: string } | null> {
   try {
     if ('showOpenFilePicker' in window) {
-      const [handle] = await fsWindow().showOpenFilePicker({ types: TSX_FILE_TYPES });
+      const [handle] = await fsWindow().showOpenFilePicker({ types: OPEN_FILE_TYPES });
       const file = await handle.getFile();
       return { name: handle.name, code: await file.text() };
     }
     return await new Promise((resolve) => {
       const input = document.createElement('input');
       input.type = 'file';
-      input.accept = '.tsx,.ts,.jsx';
+      input.accept = '.tsx,.ts,.jsx,.json';
       input.onchange = async () => {
         const file = input.files?.[0];
         if (!file) return resolve(null);
@@ -93,6 +113,48 @@ async function readTSX(): Promise<{ name: string; code: string } | null> {
     });
   } catch {
     return null;
+  }
+}
+
+/** A picked legacy file plus the file handle for upload. */
+async function pickLegacyFile(): Promise<File | null> {
+  try {
+    if ('showOpenFilePicker' in window) {
+      const [handle] = await fsWindow().showOpenFilePicker({
+        types: [
+          {
+            description: 'Legacy Screens',
+            accept: { 'application/octet-stream': ['.edl', '.ui'] },
+          },
+        ],
+      });
+      return await handle.getFile();
+    }
+    return await new Promise((resolve) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.edl,.ui';
+      input.onchange = () => resolve(input.files?.[0] ?? null);
+      input.click();
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Decide whether a just-read file is a screen IR document (route to the JSON
+ * importer) or a TSX screen (route to parseTSX). Name suffix first, then a
+ * content sniff for `schemaVersion`.
+ */
+function isScreenJSON(name: string, code: string): boolean {
+  if (name.endsWith('.screen.json')) return true;
+  if (!name.endsWith('.json')) return false;
+  try {
+    const parsed = JSON.parse(code);
+    return !!parsed && typeof parsed === 'object' && 'schemaVersion' in parsed;
+  } catch {
+    return false;
   }
 }
 
@@ -138,11 +200,21 @@ interface EditorState {
   filePath: string | null;
   isDirty: boolean;
 
+  // Import diagnostics (set by the last .screen.json / legacy import)
+  lastImportReport: ImportReport | null;
+  importError: string[] | null;
+
   // Selection
   selection: SelectionState;
 
   // Viewport
   viewport: ViewportState;
+
+  // Bumped whenever a new screen is loaded wholesale (import/open/new); the
+  // canvas watches this to auto-fit zoom. `fitNonce` is bumped by the toolbar's
+  // Fit-to-Screen button — same fit code path, on demand.
+  screenLoadId: number;
+  fitNonce: number;
 
   // Panels
   panels: PanelState;
@@ -202,7 +274,7 @@ interface EditorActions {
   // Viewport
   setZoom(zoom: number): void;
   setPan(x: number, y: number): void;
-  zoomToFit(): void;
+  requestFit(): void;
 
   // Panels
   togglePanel(panel: BooleanPanelKey): void;
@@ -222,6 +294,8 @@ interface EditorActions {
   saveToFile(): Promise<void>;
   saveAsFile(): Promise<void>;
   openFile(): Promise<void>;
+  importLegacyScreen(): Promise<void>;
+  clearImportReport(): void;
   exportTSX(): string;
 
   // Clipboard
@@ -255,8 +329,12 @@ export const useEditorStore = create<EditorStore>()(
     screen: createDefaultScreen(),
     filePath: null,
     isDirty: false,
+    lastImportReport: null,
+    importError: null,
     selection: { selectedIds: [], hoveredId: null },
     viewport: { zoom: 1, panX: 0, panY: 0 },
+    screenLoadId: 0,
+    fitNonce: 0,
     panels: DEFAULT_PANELS,
     mode: 'edit',
     editorTheme: 'g90',
@@ -276,6 +354,7 @@ export const useEditorStore = create<EditorStore>()(
         s.selection.selectedIds = [];
         s.undoStack = [];
         s.redoStack = [];
+        s.screenLoadId += 1;
       });
     },
 
@@ -390,16 +469,32 @@ export const useEditorStore = create<EditorStore>()(
 
     moveWidgets(ids, dx, dy) {
       set((s) => {
-        for (const id of ids) {
+        // Geometry is stored absolute, so moving a container must explicitly
+        // carry its whole subtree (descendants hold their own absolute coords).
+        // Collect each selected widget plus all descendants, deduped — a widget
+        // selected both directly and via an ancestor moves only once.
+        const toMove = new Map<string, Widget>();
+        const collect = (id: string) => {
+          if (toMove.has(id)) return;
           const w = s.screen.widgets[id];
-          if (w) {
-            w.layout.x += dx;
-            w.layout.y += dy;
-            if (s.screen.meta.snapToGrid) {
-              const g = s.screen.meta.gridSize;
-              w.layout.x = Math.round(w.layout.x / g) * g;
-              w.layout.y = Math.round(w.layout.y / g) * g;
-            }
+          if (!w) return;
+          toMove.set(id, w);
+          for (const cid of w.children ?? []) collect(cid);
+        };
+        for (const id of ids) collect(id);
+
+        // Snap-to-grid is applied only to the dragged (top-level selected)
+        // widgets; descendants shift by the same raw delta to preserve their
+        // offset within the container.
+        const snap = s.screen.meta.snapToGrid;
+        const g = s.screen.meta.gridSize;
+        const selected = new Set(ids);
+        for (const [id, w] of toMove) {
+          w.layout.x += dx;
+          w.layout.y += dy;
+          if (snap && selected.has(id)) {
+            w.layout.x = Math.round(w.layout.x / g) * g;
+            w.layout.y = Math.round(w.layout.y / g) * g;
           }
         }
         s.isDirty = true;
@@ -577,12 +672,11 @@ export const useEditorStore = create<EditorStore>()(
       });
     },
 
-    zoomToFit() {
-      // Will be implemented once we have canvas container dimensions
+    requestFit() {
+      // The fit math needs the canvas container's pixel size, which lives in
+      // the Canvas component. Bump the nonce; the canvas watches it and fits.
       set((s) => {
-        s.viewport.zoom = 1;
-        s.viewport.panX = 0;
-        s.viewport.panY = 0;
+        s.fitNonce += 1;
       });
     },
 
@@ -666,7 +760,15 @@ export const useEditorStore = create<EditorStore>()(
 
     async saveToFile() {
       const state = get();
-      const suggestedName = state.filePath?.split(/[/\\]/).pop() ?? 'screen.tsx';
+      // Save always writes TSX (generateTSX), so the suggested name must end in
+      // .tsx — even when filePath was inherited from a legacy import, which sets
+      // it to `.screen.json`. Otherwise we'd write TSX bytes into a .json file
+      // that the .screen.json-routed importer then fails to JSON.parse on open.
+      const base = (state.filePath?.split(/[/\\]/).pop() ?? 'screen.tsx').replace(
+        /\.(screen\.json|json|tsx|ts|jsx)$/i,
+        ''
+      );
+      const suggestedName = `${base || 'screen'}.tsx`;
       const result = await writeTSX(generateTSX(state.screen), suggestedName);
       if (!result) return;
       set((s) => {
@@ -687,8 +789,39 @@ export const useEditorStore = create<EditorStore>()(
     },
 
     async openFile() {
-      const result = await readTSX();
+      const result = await readScreenFile();
       if (!result) return;
+
+      // Route .screen.json IR documents through the importer; TSX through parseTSX.
+      if (isScreenJSON(result.name, result.code)) {
+        let imported: { screen: ScreenModel; report: ImportReport };
+        try {
+          imported = importScreenJSON(JSON.parse(result.code));
+        } catch (err) {
+          // Surface validation errors; do NOT replace the current screen.
+          set((s) => {
+            s.importError =
+              err instanceof ImportValidationError
+                ? err.errors
+                : [err instanceof Error ? err.message : String(err)];
+            s.lastImportReport = null;
+          });
+          return;
+        }
+        set((s) => {
+          s.screen = imported.screen;
+          s.filePath = result.name;
+          s.isDirty = false;
+          s.selection.selectedIds = [];
+          s.undoStack = [];
+          s.redoStack = [];
+          s.lastImportReport = imported.report;
+          s.importError = null;
+          s.screenLoadId += 1;
+        });
+        return;
+      }
+
       const screen = parseTSX(result.code);
       set((s) => {
         s.screen = screen;
@@ -697,6 +830,62 @@ export const useEditorStore = create<EditorStore>()(
         s.selection.selectedIds = [];
         s.undoStack = [];
         s.redoStack = [];
+        s.screenLoadId += 1;
+      });
+    },
+
+    async importLegacyScreen() {
+      const file = await pickLegacyFile();
+      if (!file) return;
+      const kind = file.name.endsWith('.edl')
+        ? 'edl'
+        : file.name.endsWith('.ui')
+          ? 'ui'
+          : undefined;
+
+      let imported: { screen: ScreenModel; report: ImportReport };
+      try {
+        const dto = await convertScreen(file, kind ? { kind } : {});
+        imported = importScreenJSON(dto.screen);
+        // Merge the server's (richer) diagnostics into the client report.
+        imported.report.warnings.push(...dto.warnings);
+        for (const u of dto.unknownWidgets) {
+          const existing = imported.report.unknownWidgets.find(
+            (w) => w.originalClass === u.originalClass
+          );
+          if (existing) existing.count = Math.max(existing.count, u.count);
+          else imported.report.unknownWidgets.push({ ...u });
+        }
+      } catch (err) {
+        set((s) => {
+          s.importError =
+            err instanceof ImportValidationError
+              ? err.errors
+              : err instanceof ConverterError
+                ? [`${err.code}: ${err.message}`]
+                : [err instanceof Error ? err.message : String(err)];
+          s.lastImportReport = null;
+        });
+        return;
+      }
+
+      set((s) => {
+        s.screen = imported.screen;
+        s.filePath = file.name.replace(/\.(edl|ui)$/i, '.screen.json');
+        s.isDirty = true; // converted but unsaved
+        s.selection.selectedIds = [];
+        s.undoStack = [];
+        s.redoStack = [];
+        s.lastImportReport = imported.report;
+        s.importError = null;
+        s.screenLoadId += 1;
+      });
+    },
+
+    clearImportReport() {
+      set((s) => {
+        s.lastImportReport = null;
+        s.importError = null;
       });
     },
 

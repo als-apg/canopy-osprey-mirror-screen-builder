@@ -1,4 +1,5 @@
 import { nanoid } from 'nanoid';
+import type { FormulaDeclaration } from '@canopy/screen-ir';
 import type { ScreenModel, ScreenMeta, Widget, WidgetType, WidgetProps } from '../../types/widget';
 import { createDefaultScreen, createDefaultScreenMeta, ALL_WIDGET_TYPES } from '../../types/widget';
 
@@ -101,6 +102,12 @@ function parseScreenMeta(code: string): ScreenMeta {
     }
   }
 
+  // Parse the screen-level formulas array. Matched against the full code (not
+  // the truncated meta block) and via balanced-bracket scan, since formula
+  // objects nest braces the meta-block regex would stop at.
+  const formulas = parseFormulas(code);
+  if (formulas) meta.formulas = formulas;
+
   // Fallback: try to extract title from the component name
   if (meta.title === 'New Screen') {
     const compMatch = code.match(/export\s+(?:default\s+)?function\s+(\w+)/);
@@ -111,6 +118,44 @@ function parseScreenMeta(code: string): ScreenMeta {
   }
 
   return meta;
+}
+
+/**
+ * Extract the `formulas: [ ... ]` JSON array from a generated meta block.
+ * Uses a balanced-bracket scan (formula objects nest braces) and `JSON.parse`,
+ * returning `undefined` if absent or unparseable — formulas are best-effort.
+ */
+function parseFormulas(code: string): FormulaDeclaration[] | undefined {
+  const key = code.indexOf('formulas:');
+  if (key === -1) return undefined;
+  const open = code.indexOf('[', key);
+  if (open === -1) return undefined;
+
+  let depth = 0;
+  let inString: string | null = null;
+  for (let i = open; i < code.length; i++) {
+    const ch = code[i];
+    if (inString) {
+      if (ch === '\\')
+        i++; // skip escaped char
+      else if (ch === inString) inString = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'") inString = ch;
+    else if (ch === '[') depth++;
+    else if (ch === ']') {
+      depth--;
+      if (depth === 0) {
+        try {
+          const parsed = JSON.parse(code.slice(open, i + 1));
+          return Array.isArray(parsed) && parsed.length > 0 ? parsed : undefined;
+        } catch {
+          return undefined;
+        }
+      }
+    }
+  }
+  return undefined;
 }
 
 // ── Widget Element Parser ───────────────────────────────────────────────────

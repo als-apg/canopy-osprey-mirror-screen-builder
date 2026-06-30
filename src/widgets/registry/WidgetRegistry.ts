@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react';
+import type { ComponentType, ReactNode } from 'react';
 import type { WidgetType, WidgetProps, AbsoluteLayout } from '../../types/widget';
 
 export interface WidgetDefinition {
@@ -30,6 +30,13 @@ export interface WidgetRendererProps {
   props: WidgetProps;
   isSelected: boolean;
   isEditing: boolean;
+  /**
+   * Pre-rendered child widget overlays, supplied by the canvas's recursive
+   * renderer for container widgets. Container components (Group, Rectangle as
+   * the imported `centralwidget` wrapper, etc.) render this to position their
+   * children; leaf widgets ignore it.
+   */
+  children?: ReactNode;
 }
 
 class WidgetRegistryImpl {
