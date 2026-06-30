@@ -26,7 +26,7 @@ export function ScreenImageWidget({ layout, props, isSelected }: WidgetRendererP
   // render (the React-recommended pattern) avoids an effect that would trip
   // react-hooks/set-state-in-effect.
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
-  const failed = failedSrc !== null && failedSrc === filename;
+  const failed = failedSrc === filename;
 
   const outline = isSelected ? '2px solid #0f62fe' : 'none';
 

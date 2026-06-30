@@ -68,19 +68,19 @@ export function LivePreview() {
     const Component = LiveComponent ?? FallbackComponent;
     if (!Component) return null;
 
-    // Resolve PV name macros
-    const resolvedProps = { ...widget.props };
-    if (resolvedProps.pvName) {
-      resolvedProps.pvName = resolveMacros(resolvedProps.pvName as string);
-    }
+    // Resolve PV name macros — only copy props when there's a macro to resolve.
+    const pvName = widget.props.pvName;
+    const resolvedProps = pvName
+      ? { ...widget.props, pvName: resolveMacros(pvName as string) }
+      : widget.props;
 
-    const nextSeen = new Set(seen).add(widget.id);
+    seen.add(widget.id);
     const origin = { x: widget.layout.x, y: widget.layout.y };
     const childNodes = (widget.children ?? [])
       .map((id) => screen.widgets[id])
       .filter(Boolean)
       .sort((a, b) => a.zIndex - b.zIndex)
-      .map((child) => renderWidget(child, nextSeen, origin));
+      .map((child) => renderWidget(child, seen, origin));
 
     return (
       <div

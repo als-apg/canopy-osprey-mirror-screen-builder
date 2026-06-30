@@ -473,12 +473,12 @@ export const useEditorStore = create<EditorStore>()(
         // carry its whole subtree (descendants hold their own absolute coords).
         // Collect each selected widget plus all descendants, deduped — a widget
         // selected both directly and via an ancestor moves only once.
-        const toMove = new Set<string>();
+        const toMove = new Map<string, Widget>();
         const collect = (id: string) => {
           if (toMove.has(id)) return;
           const w = s.screen.widgets[id];
           if (!w) return;
-          toMove.add(id);
+          toMove.set(id, w);
           for (const cid of w.children ?? []) collect(cid);
         };
         for (const id of ids) collect(id);
@@ -489,9 +489,7 @@ export const useEditorStore = create<EditorStore>()(
         const snap = s.screen.meta.snapToGrid;
         const g = s.screen.meta.gridSize;
         const selected = new Set(ids);
-        for (const id of toMove) {
-          const w = s.screen.widgets[id];
-          if (!w) continue;
+        for (const [id, w] of toMove) {
           w.layout.x += dx;
           w.layout.y += dy;
           if (snap && selected.has(id)) {
