@@ -1,6 +1,6 @@
 import { Header, HeaderName, HeaderGlobalBar, HeaderGlobalAction, Theme } from '@carbon/react';
 import { useState, useCallback, useEffect } from 'react';
-import { Code, Play, Light, Asleep } from '@carbon/icons-react';
+import { Code, Play, Light, Asleep, ChevronLeft, ChevronRight } from '@carbon/icons-react';
 import { useEditorStore } from '../editor/model/EditorStore';
 import { PVServiceProvider } from '../services/pv/PVContext';
 import { Toolbar } from '../editor/toolbar/Toolbar';
@@ -51,6 +51,8 @@ export function Shell() {
 
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
+  const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
+  const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(false);
 
   const screenTitle = screen.meta.title;
   const fileName = filePath ? filePath.split(/[/\\]/).pop() : null;
@@ -124,9 +126,22 @@ export function Shell() {
           <div className="shell__body">
             {/* Left sidebar: palette + tree */}
             {(panels.paletteOpen || panels.treeOpen) && showCanvas && (
-              <aside className="shell__sidebar shell__sidebar--left">
-                {panels.paletteOpen && <WidgetPalette />}
-                {panels.treeOpen && <ComponentTree />}
+              <aside
+                className={`shell__sidebar shell__sidebar--left ${leftSidebarCollapsed ? 'shell__sidebar--collapsed' : ''}`}
+              >
+                {!leftSidebarCollapsed && panels.paletteOpen && <WidgetPalette />}
+                {!leftSidebarCollapsed && panels.treeOpen && <ComponentTree />}
+                <button
+                  type="button"
+                  className="shell__sidebar-toggle"
+                  onClick={() => setLeftSidebarCollapsed((c) => !c)}
+                  aria-label={
+                    leftSidebarCollapsed ? 'Expand left sidebar' : 'Collapse left sidebar'
+                  }
+                  title={leftSidebarCollapsed ? 'Expand' : 'Collapse'}
+                >
+                  {leftSidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+                </button>
               </aside>
             )}
 
@@ -194,8 +209,21 @@ export function Shell() {
 
             {/* Right sidebar: inspector */}
             {panels.inspectorOpen && showCanvas && (
-              <aside className="shell__sidebar shell__sidebar--right">
-                <PropertyInspector />
+              <aside
+                className={`shell__sidebar shell__sidebar--right ${rightSidebarCollapsed ? 'shell__sidebar--collapsed' : ''}`}
+              >
+                {!rightSidebarCollapsed && <PropertyInspector />}
+                <button
+                  type="button"
+                  className="shell__sidebar-toggle shell__sidebar-toggle--start"
+                  onClick={() => setRightSidebarCollapsed((c) => !c)}
+                  aria-label={
+                    rightSidebarCollapsed ? 'Expand right sidebar' : 'Collapse right sidebar'
+                  }
+                  title={rightSidebarCollapsed ? 'Expand' : 'Collapse'}
+                >
+                  {rightSidebarCollapsed ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+                </button>
               </aside>
             )}
           </div>

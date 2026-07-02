@@ -74,6 +74,9 @@ export function LivePreview() {
       ? { ...widget.props, pvName: resolveMacros(pvName as string) }
       : widget.props;
 
+    const transparency = Math.min(100, Math.max(0, (widget.props.opacity as number) ?? 0));
+    const widgetOpacity = 1 - transparency / 100;
+
     seen.add(widget.id);
     const origin = { x: widget.layout.x, y: widget.layout.y };
     const childNodes = (widget.children ?? [])
@@ -93,6 +96,7 @@ export function LivePreview() {
           height: widget.layout.height,
           zIndex: widget.zIndex,
           transform: widget.rotation ? `rotate(${widget.rotation}deg)` : undefined,
+          opacity: widgetOpacity,
         }}
       >
         <Component
@@ -179,6 +183,8 @@ export function LivePreview() {
               position: 'relative',
               transform: screenScale < 1 ? `scale(${screenScale})` : undefined,
               transformOrigin: 'top left',
+              overflowX: screen.meta.showHorizontalScrollbar === false ? 'hidden' : 'auto',
+              overflowY: screen.meta.showVerticalScrollbar === false ? 'hidden' : 'auto',
             }}
           >
             {rootWidgets.map((widget) => renderWidget(widget, new Set()))}

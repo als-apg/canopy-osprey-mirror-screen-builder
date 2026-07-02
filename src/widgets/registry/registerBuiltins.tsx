@@ -16,6 +16,7 @@ import {
 import { LineWidget } from '../drawing/LineWidget';
 import { ScreenImageWidget } from '../drawing/ScreenImageWidget';
 import { useFitText } from '../shared/useFitText';
+import { ArcWidget } from '../drawing/ArcWidget';
 
 // ── Shared prop schemas ─────────────────────────────────────────────────────
 
@@ -37,12 +38,12 @@ const appearanceSchemas: PropSchema[] = [
   { key: 'fontSize', label: 'Font Size', type: 'number', section: 'appearance', min: 8, max: 72 },
   {
     key: 'opacity',
-    label: 'Opacity',
+    label: 'Transparency (%)',
     type: 'number',
     section: 'appearance',
     min: 0,
-    max: 1,
-    step: 0.1,
+    max: 100,
+    step: 1,
   },
 ];
 
@@ -100,6 +101,7 @@ function StaticLabelWidget({ layout, props, isSelected }: WidgetRendererProps) {
         width: layout.width,
         height: layout.height,
         color: props.foregroundColor ?? '#f4f4f4',
+        backgroundColor: (props.backgroundColor as string) ?? 'transparent',
         display: 'flex',
         alignItems: 'center',
         padding: '0 4px',
@@ -203,14 +205,56 @@ export function registerBuiltinWidgets() {
     category: 'input',
     icon: 'TouchInteraction',
     defaultLayout: { x: 0, y: 0, width: 100, height: 36 },
-    defaultProps: { label: 'Button', pressValue: 1 },
+    defaultProps: {
+      buttonType: 'push',
+      labelType: 'literal',
+      onLabel: 'On',
+      offLabel: 'Off',
+      invisible: false,
+      fontSize: 13,
+      foregroundColor: '#ffffff',
+      backgroundColor: '#0f62fe',
+    },
     component: CarbonPVButton,
     propsSchema: [
-      pvSchema,
-      { key: 'label', label: 'Label', type: 'string', section: 'display' },
-      { key: 'pressValue', label: 'Press Value', type: 'string', section: 'behavior' },
-      { key: 'confirmOnWrite', label: 'Confirm', type: 'boolean', section: 'behavior' },
-      ...appearanceSchemas,
+      { key: 'controlPV', label: 'Control PV', type: 'pv', section: 'pv' },
+      { key: 'readbackPV', label: 'Readback PV', type: 'pv', section: 'pv' },
+      { key: 'colorPV', label: 'Color PV', type: 'pv', section: 'pv' },
+      { key: 'visibilityPV', label: 'Visibility PV', type: 'pv', section: 'pv' },
+      {
+        key: 'buttonType',
+        label: 'Button Type',
+        type: 'select',
+        section: 'behavior',
+        options: [
+          { label: 'Push', value: 'push' },
+          { label: 'Toggle', value: 'toggle' },
+        ],
+      },
+      { key: 'invisible', label: 'Invisible', type: 'boolean', section: 'behavior' },
+      { key: 'onLabel', label: 'On Label', type: 'string', section: 'display' },
+      { key: 'offLabel', label: 'Off Label', type: 'string', section: 'display' },
+      {
+        key: 'labelType',
+        label: 'Label Type',
+        type: 'select',
+        section: 'display',
+        options: [
+          { label: 'Literal', value: 'literal' },
+          { label: 'PV State', value: 'pvState' },
+        ],
+      },
+      { key: 'fontFamily', label: 'Label Font', type: 'string', section: 'appearance' },
+      {
+        key: 'fontSize',
+        label: 'Label Size',
+        type: 'number',
+        section: 'appearance',
+        min: 8,
+        max: 72,
+      },
+      { key: 'foregroundColor', label: 'Text Color', type: 'color', section: 'appearance' },
+      { key: 'backgroundColor', label: 'Background Color', type: 'color', section: 'appearance' },
     ],
   });
 
@@ -413,6 +457,48 @@ export function registerBuiltinWidgets() {
   });
 
   widgetRegistry.register({
+    type: 'Arc',
+    label: 'Arc',
+    category: 'drawing',
+    icon: 'CircleDash',
+    defaultLayout: { x: 0, y: 0, width: 80, height: 80 },
+    defaultProps: {
+      lineColor: '#6f6f6f',
+      lineWidth: 2,
+      startAngle: 0,
+      spanAngle: 90,
+    },
+    component: ArcWidget,
+    propsSchema: [
+      { key: 'lineColor', label: 'Line Color', type: 'color', section: 'appearance' },
+      {
+        key: 'lineWidth',
+        label: 'Line Width',
+        type: 'number',
+        section: 'appearance',
+        min: 0,
+        max: 20,
+      },
+      {
+        key: 'startAngle',
+        label: 'Start Angle',
+        type: 'number',
+        section: 'appearance',
+        min: -360,
+        max: 360,
+      },
+      {
+        key: 'spanAngle',
+        label: 'Span Angle',
+        type: 'number',
+        section: 'appearance',
+        min: -360,
+        max: 360,
+      },
+    ],
+  });
+
+  widgetRegistry.register({
     type: 'Line',
     label: 'Line',
     category: 'drawing',
@@ -423,7 +509,7 @@ export function registerBuiltinWidgets() {
       lineWidth: 2,
       lineStyle: 'solid',
       arrowStart: false,
-      arrowEnd: true,
+      arrowEnd: false,
       arrowSize: 10,
     },
     component: LineWidget,
@@ -467,7 +553,7 @@ export function registerBuiltinWidgets() {
     category: 'drawing',
     icon: 'TextShortParagraph',
     defaultLayout: { x: 0, y: 0, width: 120, height: 24 },
-    defaultProps: { text: 'Label', foregroundColor: '#f4f4f4', fontSize: 14 },
+    defaultProps: { text: 'Label', foregroundColor: '#f4f4f4', fontSize: 14, opacity: 0 },
     component: StaticLabelWidget,
     propsSchema: [
       { key: 'text', label: 'Text', type: 'string', section: 'display' },

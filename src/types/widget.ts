@@ -231,6 +231,8 @@ export interface ScreenMeta {
    * and round-tripped through eject; omitted when the screen has none.
    */
   formulas?: FormulaDeclaration[];
+  showHorizontalScrollbar?: boolean;
+  showVerticalScrollbar?: boolean;
 }
 
 export interface ScreenModel {
@@ -252,6 +254,8 @@ export function createDefaultScreenMeta(): ScreenMeta {
     snapToGrid: true,
     version: '1.0.0',
     theme: 'g90',
+    showHorizontalScrollbar: true,
+    showVerticalScrollbar: true,
   };
 }
 

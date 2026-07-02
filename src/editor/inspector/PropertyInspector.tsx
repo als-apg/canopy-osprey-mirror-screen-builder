@@ -32,6 +32,7 @@ export function PropertyInspector() {
   const updateWidget = useEditorStore((s) => s.updateWidget);
   const updateWidgetProps = useEditorStore((s) => s.updateWidgetProps);
   const updateWidgetLayout = useEditorStore((s) => s.updateWidgetLayout);
+  const updateScreenMeta = useEditorStore((s) => s.updateScreenMeta);
 
   const selectedWidget =
     selection.selectedIds.length === 1 ? screen.widgets[selection.selectedIds[0]] : null;
@@ -73,14 +74,98 @@ export function PropertyInspector() {
   );
 
   if (!selectedWidget) {
+    if (selection.selectedIds.length > 1) {
+      return (
+        <div className="property-inspector">
+          <div className="property-inspector__header">Properties</div>
+          <div className="property-inspector__empty">
+            {`${selection.selectedIds.length} widgets selected`}
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="property-inspector">
         <div className="property-inspector__header">Properties</div>
-        <div className="property-inspector__empty">
-          {selection.selectedIds.length > 1
-            ? `${selection.selectedIds.length} widgets selected`
-            : 'Select a widget to edit its properties'}
+        <div className="property-inspector__widget-type">
+          <Tag type="cool-gray" size="sm">
+            Screen
+          </Tag>
         </div>
+
+        <Accordion size="sm">
+          <AccordionItem title="Screen" open>
+            <div className="property-inspector__field">
+              <TextInput
+                id="screen-title"
+                labelText="Title"
+                size="sm"
+                value={screen.meta.title}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  updateScreenMeta({ title: e.target.value })
+                }
+              />
+            </div>
+            <div className="property-inspector__layout-grid">
+              <NumberInput
+                id="screen-width"
+                label="Width"
+                size="sm"
+                min={1}
+                value={screen.meta.width}
+                onChange={(_, { value }) => updateScreenMeta({ width: Number(value) })}
+                hideSteppers
+              />
+              <NumberInput
+                id="screen-height"
+                label="Height"
+                size="sm"
+                min={1}
+                value={screen.meta.height}
+                onChange={(_, { value }) => updateScreenMeta({ height: Number(value) })}
+                hideSteppers
+              />
+            </div>
+            <div className="property-inspector__field">
+              <TextInput
+                id="screen-bg"
+                labelText="Background Color"
+                size="sm"
+                type="color"
+                value={screen.meta.backgroundColor}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  updateScreenMeta({ backgroundColor: e.target.value })
+                }
+              />
+            </div>
+          </AccordionItem>
+
+          <AccordionItem title="Scrolling" open>
+            <div className="property-inspector__field">
+              <Toggle
+                id="screen-scroll-h"
+                labelText="Horizontal scrollbar"
+                size="sm"
+                toggled={screen.meta.showHorizontalScrollbar !== false}
+                onToggle={(checked: boolean) =>
+                  updateScreenMeta({ showHorizontalScrollbar: checked })
+                }
+              />
+            </div>
+            <div className="property-inspector__field">
+              <Toggle
+                id="screen-scroll-v"
+                labelText="Vertical scrollbar"
+                size="sm"
+                toggled={screen.meta.showVerticalScrollbar !== false}
+                onToggle={(checked: boolean) =>
+                  updateScreenMeta({ showVerticalScrollbar: checked })
+                }
+              />
+            </div>
+          </AccordionItem>
+        </Accordion>
       </div>
     );
   }

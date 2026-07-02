@@ -20,6 +20,7 @@ export function Canvas() {
   const selectWidgets = useEditorStore((s) => s.selectWidgets);
   const clearSelection = useEditorStore((s) => s.clearSelection);
   const moveWidgets = useEditorStore((s) => s.moveWidgets);
+  const resizeWidget = useEditorStore((s) => s.resizeWidget);
   const pushUndo = useEditorStore((s) => s.pushUndo);
   const setHovered = useEditorStore((s) => s.setHovered);
   const addWidget = useEditorStore((s) => s.addWidget);
@@ -31,6 +32,12 @@ export function Canvas() {
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [resize, setResize] = useState<{
+    id: string;
+    handle: 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w';
+    startMouse: { x: number; y: number };
+    startLayout: { x: number; y: number; width: number; height: number };
+  } | null>(null);
   const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(
     null
   );
@@ -134,6 +141,35 @@ export function Canvas() {
       }
 
       if (e.button === 0) {
+        // Resize handle takes priority over move
+        const handleEl = (e.target as HTMLElement).closest('[data-resize-handle]');
+        if (handleEl) {
+          const handle = handleEl.getAttribute('data-resize-handle') as
+            | 'nw'
+            | 'ne'
+            | 'sw'
+            | 'se'
+            | 'n'
+            | 's'
+            | 'e'
+            | 'w';
+          const widgetEl = handleEl.closest('[data-widget-id]');
+          const id = widgetEl?.getAttribute('data-widget-id');
+          const widget = id ? screen.widgets[id] : null;
+          if (id && widget) {
+            pushUndo();
+            const pos = screenToCanvas(e.clientX, e.clientY);
+            setResize({
+              id,
+              handle,
+              startMouse: pos,
+              startLayout: { ...widget.layout },
+            });
+            e.stopPropagation();
+            return;
+          }
+        }
+
         const target = (e.target as HTMLElement).closest('[data-widget-id]');
         if (target) {
           const id = target.getAttribute('data-widget-id')!;
@@ -164,6 +200,7 @@ export function Canvas() {
       screenToCanvas,
       paletteDrag,
       pushUndo,
+      screen.widgets,
     ]
   );
 
@@ -172,6 +209,38 @@ export function Canvas() {
       // Panning
       if (e.buttons === 4 || (isPanning && e.buttons === 1)) {
         setPan(e.clientX - panStart.x, e.clientY - panStart.y);
+        return;
+      }
+
+      // Widget resize
+      if (resize && e.buttons === 1) {
+        const pos = screenToCanvas(e.clientX, e.clientY);
+        const dx = pos.x - resize.startMouse.x;
+        const dy = pos.y - resize.startMouse.y;
+        const MIN = 10;
+        let { x, y, width, height } = resize.startLayout;
+        if (resize.handle.includes('e')) {
+          width = Math.max(MIN, resize.startLayout.width + dx);
+        }
+        if (resize.handle.includes('w')) {
+          const newW = Math.max(MIN, resize.startLayout.width - dx);
+          x = resize.startLayout.x + (resize.startLayout.width - newW);
+          width = newW;
+        }
+        if (resize.handle.includes('s')) {
+          height = Math.max(MIN, resize.startLayout.height + dy);
+        }
+        if (resize.handle.includes('n')) {
+          const newH = Math.max(MIN, resize.startLayout.height - dy);
+          y = resize.startLayout.y + (resize.startLayout.height - newH);
+          height = newH;
+        }
+        resizeWidget(resize.id, {
+          x: Math.round(x),
+          y: Math.round(y),
+          width: Math.round(width),
+          height: Math.round(height),
+        });
         return;
       }
 
@@ -201,6 +270,7 @@ export function Canvas() {
     [
       isPanning,
       isDragging,
+      resize,
       panStart,
       dragStart,
       marquee,
@@ -208,6 +278,7 @@ export function Canvas() {
       selection.selectedIds,
       setPan,
       moveWidgets,
+      resizeWidget,
       screenToCanvas,
     ]
   );
@@ -254,6 +325,7 @@ export function Canvas() {
         if (ids.length > 0) selectWidgets(ids);
       }
       setIsDragging(false);
+      setResize(null);
       setMarquee(null);
     },
     [paletteDrag, marquee, screen.widgets, selectWidgets, screenToCanvas, addWidget, endPaletteDrag]

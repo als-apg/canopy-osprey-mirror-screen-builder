@@ -31,6 +31,8 @@ export function WidgetOverlay({
   const { width, height } = widget.layout;
   const x = widget.layout.x - (parentOrigin?.x ?? 0);
   const y = widget.layout.y - (parentOrigin?.y ?? 0);
+  const transparency = Math.min(100, Math.max(0, (widget.props.opacity as number) ?? 0));
+  const widgetOpacity = 1 - transparency / 100;
 
   return (
     <div
@@ -48,19 +50,43 @@ export function WidgetOverlay({
       onMouseEnter={onHover}
       onMouseLeave={onHoverEnd}
     >
-      {children}
+      <div style={{ width: '100%', height: '100%', opacity: widgetOpacity }}>{children}</div>
 
       {/* Selection handles */}
       {isSelected && (
         <>
-          <div className="widget-overlay__handle widget-overlay__handle--nw" />
-          <div className="widget-overlay__handle widget-overlay__handle--ne" />
-          <div className="widget-overlay__handle widget-overlay__handle--sw" />
-          <div className="widget-overlay__handle widget-overlay__handle--se" />
-          <div className="widget-overlay__handle widget-overlay__handle--n" />
-          <div className="widget-overlay__handle widget-overlay__handle--s" />
-          <div className="widget-overlay__handle widget-overlay__handle--e" />
-          <div className="widget-overlay__handle widget-overlay__handle--w" />
+          <div
+            className="widget-overlay__handle widget-overlay__handle--nw"
+            data-resize-handle="nw"
+          />
+          <div
+            className="widget-overlay__handle widget-overlay__handle--ne"
+            data-resize-handle="ne"
+          />
+          <div
+            className="widget-overlay__handle widget-overlay__handle--sw"
+            data-resize-handle="sw"
+          />
+          <div
+            className="widget-overlay__handle widget-overlay__handle--se"
+            data-resize-handle="se"
+          />
+          <div
+            className="widget-overlay__handle widget-overlay__handle--n"
+            data-resize-handle="n"
+          />
+          <div
+            className="widget-overlay__handle widget-overlay__handle--s"
+            data-resize-handle="s"
+          />
+          <div
+            className="widget-overlay__handle widget-overlay__handle--e"
+            data-resize-handle="e"
+          />
+          <div
+            className="widget-overlay__handle widget-overlay__handle--w"
+            data-resize-handle="w"
+          />
         </>
       )}
 

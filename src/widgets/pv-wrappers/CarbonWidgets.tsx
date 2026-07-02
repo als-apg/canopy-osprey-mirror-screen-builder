@@ -1,14 +1,5 @@
 import { useState, useCallback } from 'react';
-import {
-  TextInput,
-  Button,
-  Slider,
-  Toggle,
-  ProgressBar,
-  Tag,
-  Dropdown,
-  Checkbox,
-} from '@carbon/react';
+import { TextInput, Slider, Toggle, ProgressBar, Tag, Dropdown, Checkbox } from '@carbon/react';
 import { usePV } from '../../hooks/usePV';
 import { alarmBorderStyle } from '../../theme/alarm';
 import { AlarmSeverity, AlarmSeverityName } from '../../types/widget';
@@ -124,48 +115,78 @@ export function CarbonPVTextInput({
   );
 }
 
-/** PVButton — Carbon Button that writes to PV */
+/** PVButton — push or toggle button writing to a Control PV */
 export function CarbonPVButton({ layout, props, isEditing }: WidgetRendererProps) {
-  const pv = usePV(props.pvName as string | undefined);
-  const label = (props.label as string) ?? 'Button';
-  const maxFontSize = (props.fontSize as number) ?? 14;
-  const { ref, fontSize } = useFitText<HTMLSpanElement>(maxFontSize, [
-    label,
-    layout.width,
-    layout.height,
-  ]);
+  const controlPV = usePV(props.controlPV as string | undefined);
+  const readbackPV = usePV(props.readbackPV as string | undefined);
+  const colorPV = usePV(props.colorPV as string | undefined);
+  const visibilityPV = usePV(props.visibilityPV as string | undefined);
+
+  const buttonType = (props.buttonType as 'push' | 'toggle') ?? 'push';
+  const labelType = (props.labelType as 'literal' | 'pvState') ?? 'literal';
+  const onLabel = (props.onLabel as string) ?? 'On';
+  const offLabel = (props.offLabel as string) ?? 'Off';
+  const invisible = props.invisible === true;
+  const fontFamily = (props.fontFamily as string) || 'IBM Plex Sans, sans-serif';
+  const fontSize = (props.fontSize as number) ?? 13;
+  const foregroundColor = (props.foregroundColor as string) ?? '#ffffff';
+  const baseBg = (props.backgroundColor as string) ?? '#0f62fe';
+
+  const isOn =
+    readbackPV.connected &&
+    (typeof readbackPV.value === 'number' ? readbackPV.value !== 0 : Boolean(readbackPV.value));
 
   const handleClick = useCallback(() => {
-    if (!isEditing && pv.connected && props.pressValue !== undefined) {
-      pv.put(props.pressValue as number | string);
+    if (isEditing || !controlPV.address) return;
+    if (buttonType === 'toggle') {
+      controlPV.put(isOn ? 0 : 1);
+    } else {
+      controlPV.put(1);
     }
-  }, [isEditing, pv, props.pressValue]);
+  }, [isEditing, controlPV, buttonType, isOn]);
+
+  // Visibility PV: hide at runtime when its value is falsy
+  if (!isEditing && props.visibilityPV && visibilityPV.connected) {
+    const visible =
+      typeof visibilityPV.value === 'number'
+        ? visibilityPV.value !== 0
+        : Boolean(visibilityPV.value);
+    if (!visible) return null;
+  }
+  // Invisible toggle: hide at runtime, dim in editor
+  if (!isEditing && invisible) return null;
+
+  const backgroundColor =
+    props.colorPV && colorPV.connected && typeof colorPV.value === 'string'
+      ? colorPV.value
+      : baseBg;
+
+  let label: string;
+  if (labelType === 'pvState') {
+    label = readbackPV.connected ? String(readbackPV.value ?? '') : '';
+  } else {
+    label = isOn ? onLabel : offLabel;
+  }
 
   return (
-    <div style={{ width: layout.width, height: layout.height, overflow: 'hidden' }}>
-      <Button
-        size="sm"
-        kind="primary"
-        onClick={handleClick}
-        disabled={!!props.pvName && !pv.connected}
-        className="carbon-pv-button"
-        style={{ width: '100%', height: '100%', maxWidth: 'none' }}
-      >
-        <span
-          ref={ref}
-          style={{
-            display: 'block',
-            fontSize,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            maxWidth: '100%',
-          }}
-        >
-          {label}
-        </span>
-      </Button>
-    </div>
+    <button
+      onClick={handleClick}
+      style={{
+        width: layout.width,
+        height: layout.height,
+        backgroundColor,
+        color: foregroundColor,
+        fontFamily,
+        fontSize,
+        border: 'none',
+        borderRadius: 2,
+        cursor: isEditing ? 'default' : 'pointer',
+        opacity: invisible ? 0.35 : 1,
+        padding: 0,
+      }}
+    >
+      {label}
+    </button>
   );
 }
 
