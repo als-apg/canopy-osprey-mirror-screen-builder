@@ -156,6 +156,14 @@ const TYPE_MAP: Record<string, TypeMapEntry> = {
     map: (ir, p) => put(p, 'pvName', str(ir.pv)),
     consumes: ['pv'],
   },
+  'pv-radio-group': {
+    sbType: 'PVRadioGroup',
+    map: (ir, p) => {
+      put(p, 'pvName', str(ir.pv));
+      put(p, 'orientation', ir.orientation);
+      put(p, 'alarmSensitiveBorder', bool(ir.alarmSensitive));
+    },
+  },
   'pv-slider': {
     sbType: 'PVSlider',
     map: (ir, p) => {
@@ -188,6 +196,17 @@ const TYPE_MAP: Record<string, TypeMapEntry> = {
       put(p, 'orientation', ir.orientation);
     },
     consumes: ['pv', 'min', 'max', 'orientation'],
+  },
+  'pv-meter': {
+    sbType: 'PVMeter',
+    map: (ir, p) => {
+      put(p, 'pvName', str(ir.pv));
+      put(p, 'minValue', num(ir.min));
+      put(p, 'maxValue', num(ir.max));
+      put(p, 'label', str(ir.label));
+      put(p, 'showValueLabel', bool(ir.showValue));
+      put(p, 'units', str(ir.units));
+    },
   },
   'pv-byte-led': {
     sbType: 'PVByteIndicator',
