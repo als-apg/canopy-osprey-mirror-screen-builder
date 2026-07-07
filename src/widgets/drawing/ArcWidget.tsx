@@ -15,6 +15,8 @@ export function ArcWidget({ layout, props, isSelected }: WidgetRendererProps) {
   const lineWidth = (props.lineWidth as number) ?? 1;
   const startAngle = (props.startAngle as number) ?? 0;
   const rawSpan = (props.spanAngle as number) ?? 90;
+  const fill = (props.fill as boolean) ?? false;
+  const fillColor = (props.fillColor as string) ?? '#393939';
 
   const w = layout.width;
   const h = layout.height;
@@ -49,6 +51,28 @@ export function ArcWidget({ layout, props, isSelected }: WidgetRendererProps) {
     return `M ${start.x} ${start.y} A ${rx} ${ry} 0 ${largeArc} ${sweep} ${end.x} ${end.y}`;
   }, [cx, cy, rx, ry, startAngle, span, isFullCircle]);
 
+  const fillPath = useMemo(() => {
+    if (rx === 0 || ry === 0) return '';
+
+    if (isFullCircle) {
+      // Same closed two-half-arc path as the stroke: the filled region is the whole ellipse.
+      const p0 = polarPoint(cx, cy, rx, ry, startAngle);
+      const p1 = polarPoint(cx, cy, rx, ry, startAngle + 180);
+      const sweep = span > 0 ? 1 : 0;
+      return (
+        `M ${p0.x} ${p0.y} ` +
+        `A ${rx} ${ry} 0 0 ${sweep} ${p1.x} ${p1.y} ` +
+        `A ${rx} ${ry} 0 0 ${sweep} ${p0.x} ${p0.y} Z`
+      );
+    }
+
+    const start = polarPoint(cx, cy, rx, ry, startAngle);
+    const end = polarPoint(cx, cy, rx, ry, startAngle + span);
+    const largeArc = Math.abs(span) > 180 ? 1 : 0;
+    const sweep = span > 0 ? 1 : 0;
+    return `M ${cx} ${cy} L ${start.x} ${start.y} A ${rx} ${ry} 0 ${largeArc} ${sweep} ${end.x} ${end.y} Z`;
+  }, [cx, cy, rx, ry, startAngle, span, isFullCircle]);
+
   return (
     <svg
       width={w}
@@ -56,6 +80,7 @@ export function ArcWidget({ layout, props, isSelected }: WidgetRendererProps) {
       viewBox={`0 0 ${w} ${h}`}
       style={{ overflow: 'visible', outline: isSelected ? '2px solid #0f62fe' : 'none' }}
     >
+      {fill && fillPath && <path d={fillPath} fill={fillColor} stroke="none" />}
       {arcPath && (
         <path
           d={arcPath}

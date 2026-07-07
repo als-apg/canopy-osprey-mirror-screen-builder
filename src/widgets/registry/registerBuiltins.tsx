@@ -465,6 +465,7 @@ export function registerBuiltinWidgets() {
     defaultProps: {
       lineColor: '#6f6f6f',
       lineWidth: 2,
+      fill: false,
       startAngle: 0,
       spanAngle: 90,
     },
@@ -479,6 +480,8 @@ export function registerBuiltinWidgets() {
         min: 0,
         max: 20,
       },
+      { key: 'fill', label: 'Fill', type: 'boolean', section: 'appearance' },
+      { key: 'fillColor', label: 'Fill Color', type: 'color', section: 'appearance' },
       {
         key: 'startAngle',
         label: 'Start Angle',
