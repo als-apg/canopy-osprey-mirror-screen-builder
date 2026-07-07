@@ -12,6 +12,7 @@ import {
   CarbonPVDropdown,
   CarbonPVCheckbox,
   CarbonPVByteIndicator,
+  CarbonPVRadioGroup,
 } from '../pv-wrappers/CarbonWidgets';
 import { LineWidget } from '../drawing/LineWidget';
 import { ScreenImageWidget } from '../drawing/ScreenImageWidget';
@@ -313,6 +314,31 @@ export function registerBuiltinWidgets() {
     propsSchema: [
       pvSchema,
       { key: 'label', label: 'Label', type: 'string', section: 'display' },
+      ...alarmSchemas,
+    ],
+  });
+
+  widgetRegistry.register({
+    type: 'PVRadioGroup',
+    label: 'Radio Group',
+    category: 'input',
+    icon: 'RadioButton',
+    defaultLayout: { x: 0, y: 0, width: 160, height: 96 },
+    defaultProps: { orientation: 'vertical' },
+    component: CarbonPVRadioGroup,
+    propsSchema: [
+      pvSchema,
+      { key: 'label', label: 'Label', type: 'string', section: 'display' },
+      {
+        key: 'orientation',
+        label: 'Orientation',
+        type: 'select',
+        section: 'display',
+        options: [
+          { label: 'Vertical', value: 'vertical' },
+          { label: 'Horizontal', value: 'horizontal' },
+        ],
+      },
       ...alarmSchemas,
     ],
   });
