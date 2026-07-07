@@ -26,6 +26,11 @@
   color: var(--cds-text-helper);
 }
 
+.code-editor__note {
+  font-weight: 400;
+  color: var(--cds-text-helper);
+}
+
 .code-editor__body {
   flex: 1;
   min-height: 0;

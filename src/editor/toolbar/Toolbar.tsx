@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { Button } from '@carbon/react';
 import {
   DocumentAdd,
+  DocumentExport,
   DocumentImport,
   FolderOpen,
   Save,
@@ -27,6 +28,7 @@ import './Toolbar.scss';
 export function Toolbar() {
   const saveToFile = useEditorStore((s) => s.saveToFile);
   const saveAsFile = useEditorStore((s) => s.saveAsFile);
+  const exportCodeFile = useEditorStore((s) => s.exportCodeFile);
   const openFile = useEditorStore((s) => s.openFile);
   const importLegacyScreen = useEditorStore((s) => s.importLegacyScreen);
   const setScreen = useEditorStore((s) => s.setScreen);
@@ -129,6 +131,15 @@ export function Toolbar() {
           iconDescription="Save As"
           tooltipPosition="bottom"
           onClick={saveAsFile}
+        />
+        <Button
+          kind="ghost"
+          size="sm"
+          hasIconOnly
+          renderIcon={DocumentExport}
+          iconDescription="Export as code (.tsx) — one-way; this file cannot be re-imported"
+          tooltipPosition="bottom"
+          onClick={() => void exportCodeFile()}
         />
       </div>
 

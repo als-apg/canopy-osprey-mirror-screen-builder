@@ -100,7 +100,7 @@ export function Shell() {
                 {isDark ? <Light size={20} /> : <Asleep size={20} />}
               </HeaderGlobalAction>
               <HeaderGlobalAction
-                aria-label="Toggle Code Editor"
+                aria-label="Toggle code preview (read-only TSX export)"
                 isActive={panels.codeEditorOpen}
                 onClick={() => togglePanel('codeEditorOpen')}
                 tooltipAlignment="end"
