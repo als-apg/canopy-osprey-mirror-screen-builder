@@ -15,6 +15,7 @@ import {
 } from '../pv-wrappers/CarbonWidgets';
 import { LineWidget } from '../drawing/LineWidget';
 import { ScreenImageWidget } from '../drawing/ScreenImageWidget';
+import { PVMeterWidget } from '../indicators/PVMeterWidget';
 import { useFitText } from '../shared/useFitText';
 import { ArcWidget } from '../drawing/ArcWidget';
 
@@ -363,6 +364,25 @@ export function registerBuiltinWidgets() {
       { key: 'maxValue', label: 'Max', type: 'number', section: 'behavior' },
       ...alarmSchemas,
       ...appearanceSchemas,
+    ],
+  });
+
+  widgetRegistry.register({
+    type: 'PVMeter',
+    label: 'Meter',
+    category: 'indicator',
+    icon: 'Meter',
+    defaultLayout: { x: 0, y: 0, width: 160, height: 100 },
+    defaultProps: { minValue: 0, maxValue: 100, showValueLabel: true, alarmSensitiveBorder: true },
+    component: PVMeterWidget,
+    propsSchema: [
+      pvSchema,
+      { key: 'label', label: 'Label', type: 'string', section: 'display' },
+      { key: 'showValueLabel', label: 'Show Value', type: 'boolean', section: 'display' },
+      { key: 'units', label: 'Units', type: 'string', section: 'display' },
+      { key: 'minValue', label: 'Min', type: 'number', section: 'behavior' },
+      { key: 'maxValue', label: 'Max', type: 'number', section: 'behavior' },
+      ...alarmSchemas,
     ],
   });
 
