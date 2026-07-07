@@ -1,16 +1,34 @@
-// IR widget type → Screen Builder widget mapping.
+// IR widget type ↔ Screen Builder widget mapping.
 //
-// Single source of truth for turning a converter-emitted `WidgetNode` (kebab
-// registry id + IR props) into the SB's `WidgetType` + `WidgetProps`. Pure: no
-// React, no store. Consumed by `importScreenJSON`.
+// This is the contract for BOTH directions: `importScreenJSON.ts` (IR →
+// ScreenModel) and `../export/exportScreenJSON.ts` (ScreenModel → IR) both
+// build on the tables here. Pure: no React, no store.
 //
 // Two contracts drive the design:
 //  - **Nothing is silently dropped.** `unknown-widget` (and any IR type not in
 //    the table) becomes a `Rectangle` placeholder that preserves the original
 //    class + props, and is reported. This mirrors the converter's D11 contract.
+//    On save, an unknown-widget placeholder normalizes back to `'rectangle'`,
+//    keeping `originalClass`/`originalProps` as plain props.
 //  - **Eject must not break.** `Widget.type` is the closed `WidgetType` union
 //    that `generateTSX` emits verbatim, so every mapping target is a real
 //    catalog type — never a raw IR id.
+//
+// Reserved carrier props (documented fully in `exportScreenJSON.ts`, which
+// writes them): the exporter stashes SB `Widget` fields that have no IR field
+// as widget props under these reserved names, and `importScreenJSON.ts` lifts
+// them back OUT of props onto the `Widget` — `name`, `actions`, `visible`,
+// `rotation`, `locked`. A mapper here never needs to special-case them; they
+// ride through the generic per-type prop bag like any other prop and are
+// lifted post-hoc by the importer.
+//
+// Per-entry `consumes` (added instead of one global set): each `TYPE_MAP`
+// entry declares exactly the IR prop keys ITS mapper reads, and the generic
+// pass-through in `mapWidget` only skips the CURRENT entry's consumed keys
+// (plus keys already written — the existing `key in props` check). A single
+// global "consumed" set over-dropped props: e.g. a `label` prop on `pv-label`
+// was silently discarded because a DIFFERENT type (`pv-button`) consumed
+// `label`. Scoping consumption per-type fixes that.
 
 import type { WidgetNode } from '@canopy/screen-ir';
 import type { Action, WidgetType, WidgetProps } from '../../types/widget';
@@ -54,10 +72,10 @@ function put(props: WidgetProps, key: string, value: unknown): void {
 }
 
 // ── Per-type prop mappers ────────────────────────────────────────────────────
-// Each reads the IR props bag and writes the SB-named props. Keys not consumed
-// here are passed through verbatim by the generic pass-through below (the
-// `WidgetProps` index signature allows arbitrary keys), so unknown-but-harmless
-// props survive rather than vanish.
+// Each reads the IR props bag and writes the SB-named props. Keys not listed
+// in the entry's `consumes` are passed through verbatim by the generic
+// pass-through below (the `WidgetProps` index signature allows arbitrary
+// keys), so unknown-but-harmless props survive rather than vanish.
 
 type IRProps = Record<string, unknown>;
 type PropMapper = (ir: IRProps, props: WidgetProps) => void;
@@ -67,13 +85,26 @@ function copyAppearance(ir: IRProps, props: WidgetProps): void {
   for (const k of FOREGROUND) put(props, k, ir[k]);
 }
 
-const TYPE_MAP: Record<string, { sbType: WidgetType; map: PropMapper; degradeReason?: string }> = {
+interface TypeMapEntry {
+  sbType: WidgetType;
+  map: PropMapper;
+  /** IR prop keys this mapper reads; the generic pass-through skips these. */
+  consumes: readonly string[];
+  degradeReason?: string;
+}
+
+const TYPE_MAP: Record<string, TypeMapEntry> = {
   'text-label': {
     sbType: 'StaticLabel',
+    // `label` is only a fallback when `text` is absent — a node carrying BOTH
+    // keeps both (the second `put` re-adds `label` in that case, since the
+    // first `put` above only ever writes to the `text` key).
     map: (ir, p) => {
       put(p, 'text', str(ir.text) ?? str(ir.label));
+      if (ir.text !== undefined && ir.label !== undefined) put(p, 'label', ir.label);
       copyAppearance(ir, p);
     },
+    consumes: ['text', 'label', ...FOREGROUND],
   },
   'pv-label': {
     sbType: 'PVTextDisplay',
@@ -85,6 +116,7 @@ const TYPE_MAP: Record<string, { sbType: WidgetType; map: PropMapper; degradeRea
       put(p, 'precisionFromPV', bool(ir.precisionFromPV));
       copyAppearance(ir, p);
     },
+    consumes: ['pv', 'format', 'precision', 'showUnits', 'precisionFromPV', ...FOREGROUND],
   },
   'pv-text-input': {
     sbType: 'PVTextInput',
@@ -93,6 +125,7 @@ const TYPE_MAP: Record<string, { sbType: WidgetType; map: PropMapper; degradeRea
       put(p, 'confirmOnWrite', bool(ir.confirmOnWrite));
       put(p, 'confirmMessage', str(ir.confirmMessage));
     },
+    consumes: ['pv', 'confirmOnWrite', 'confirmMessage'],
   },
   'pv-button': {
     sbType: 'PVButton',
@@ -102,6 +135,7 @@ const TYPE_MAP: Record<string, { sbType: WidgetType; map: PropMapper; degradeRea
       put(p, 'pressValue', ir.pressValue);
       put(p, 'releaseValue', ir.releaseValue);
     },
+    consumes: ['pv', 'label', 'pressValue', 'releaseValue'],
   },
   'regular-button': {
     sbType: 'PVButton',
@@ -110,6 +144,7 @@ const TYPE_MAP: Record<string, { sbType: WidgetType; map: PropMapper; degradeRea
       put(p, 'pressValue', ir.pressValue);
       put(p, 'releaseValue', ir.releaseValue);
     },
+    consumes: ['label', 'pressValue', 'releaseValue'],
   },
   'pv-checkbox': {
     sbType: 'PVCheckbox',
@@ -117,10 +152,12 @@ const TYPE_MAP: Record<string, { sbType: WidgetType; map: PropMapper; degradeRea
       put(p, 'pvName', str(ir.pv));
       put(p, 'label', str(ir.label));
     },
+    consumes: ['pv', 'label'],
   },
   'pv-enum-combobox': {
     sbType: 'PVDropdown',
     map: (ir, p) => put(p, 'pvName', str(ir.pv)),
+    consumes: ['pv'],
   },
   'pv-slider': {
     sbType: 'PVSlider',
@@ -134,6 +171,16 @@ const TYPE_MAP: Record<string, { sbType: WidgetType; map: PropMapper; degradeRea
       put(p, 'showScale', bool(ir.showScale));
       put(p, 'limitsFromPV', bool(ir.limitsFromPV));
     },
+    consumes: [
+      'pv',
+      'min',
+      'max',
+      'orientation',
+      'showValue',
+      'increment',
+      'showScale',
+      'limitsFromPV',
+    ],
   },
   'pv-progress-bar': {
     sbType: 'PVProgressBar',
@@ -143,6 +190,7 @@ const TYPE_MAP: Record<string, { sbType: WidgetType; map: PropMapper; degradeRea
       put(p, 'maxValue', num(ir.max));
       put(p, 'orientation', ir.orientation);
     },
+    consumes: ['pv', 'min', 'max', 'orientation'],
   },
   'pv-byte-led': {
     sbType: 'PVByteIndicator',
@@ -154,6 +202,7 @@ const TYPE_MAP: Record<string, { sbType: WidgetType; map: PropMapper; degradeRea
       put(p, 'onColor', str(ir.onColor));
       put(p, 'offColor', str(ir.offColor));
     },
+    consumes: ['pv', 'numBits', 'shift', 'bigEndian', 'onColor', 'offColor'],
   },
   'pv-led': {
     sbType: 'PVLed',
@@ -163,6 +212,7 @@ const TYPE_MAP: Record<string, { sbType: WidgetType; map: PropMapper; degradeRea
       put(p, 'onColor', str(ir.onColor));
       put(p, 'offColor', str(ir.offColor));
     },
+    consumes: ['pv', 'bit', 'onColor', 'offColor'],
   },
   'embedded-display': {
     sbType: 'EmbeddedScreen',
@@ -171,6 +221,7 @@ const TYPE_MAP: Record<string, { sbType: WidgetType; map: PropMapper; degradeRea
       put(p, 'macros', ir.macros);
       put(p, 'resizeMode', ir.resizeMode);
     },
+    consumes: ['file', 'macros', 'resizeMode'],
   },
   'image-view': {
     sbType: 'ScreenImage',
@@ -178,12 +229,14 @@ const TYPE_MAP: Record<string, { sbType: WidgetType; map: PropMapper; degradeRea
       put(p, 'filename', str(ir.src));
       put(p, 'stretchMode', ir.stretchMode);
     },
+    consumes: ['src', 'stretchMode'],
   },
   'related-display-button': {
     sbType: 'PVButton',
     // `file`/`macros` are turned into an open_display Action by mapWidget, not
-    // props — so they're listed in CONSUMED_KEYS to keep them off the button.
+    // props — so they're listed in `consumes` to keep them off the button.
     map: (ir, p) => put(p, 'label', str(ir.label)),
+    consumes: ['label', 'file', 'macros'],
     degradeReason:
       'related-display navigation carried as an open_display action; review target window behavior',
   },
@@ -193,6 +246,7 @@ const TYPE_MAP: Record<string, { sbType: WidgetType; map: PropMapper; degradeRea
     map: (_ir, p) => {
       p.layoutMode = 'absolute';
     },
+    consumes: [],
     degradeReason: 'frame border/shadow chrome is not represented; rendered as a plain Group',
   },
   'group-box': {
@@ -201,6 +255,7 @@ const TYPE_MAP: Record<string, { sbType: WidgetType; map: PropMapper; degradeRea
       p.layoutMode = 'absolute';
       put(p, 'label', str(ir.title));
     },
+    consumes: ['title'],
     degradeReason: 'group-box title chrome is not represented; preserved as label on a plain Group',
   },
   'scroll-area': {
@@ -208,6 +263,7 @@ const TYPE_MAP: Record<string, { sbType: WidgetType; map: PropMapper; degradeRea
     map: (_ir, p) => {
       p.layoutMode = 'absolute';
     },
+    consumes: [],
     degradeReason:
       'scroll-area scrolling/clipping is not represented; children laid out absolutely',
   },
@@ -216,46 +272,106 @@ const TYPE_MAP: Record<string, { sbType: WidgetType; map: PropMapper; degradeRea
     map: (_ir, p) => {
       p.layoutMode = 'absolute';
     },
+    consumes: [],
     degradeReason: 'tabs structure is not represented; pages flattened into a single Group',
+  },
+
+  // ── Identity entries for SB-native types ──────────────────────────────────
+  // The exporter emits these kebab ids verbatim for widget types that already
+  // have a 1:1 IR shape (either because they're pure drawings with no rename
+  // table, or because the SB model already uses the IR's own key names). Each
+  // copies every IR prop through unchanged, so import is total over
+  // everything the exporter can produce.
+  rectangle: {
+    sbType: 'Rectangle',
+    map: (ir, p) => copyVerbatim(ir, p),
+    consumes: [],
+  },
+  ellipse: {
+    sbType: 'Ellipse',
+    map: (ir, p) => copyVerbatim(ir, p),
+    consumes: [],
+  },
+  arc: {
+    sbType: 'Arc',
+    map: (ir, p) => copyVerbatim(ir, p),
+    consumes: [],
+  },
+  line: {
+    sbType: 'Line',
+    map: (ir, p) => copyVerbatim(ir, p),
+    consumes: [],
+  },
+  group: {
+    sbType: 'Group',
+    // Verbatim — do NOT force layoutMode; the exporter/model already carries
+    // whatever layoutMode the widget had.
+    map: (ir, p) => copyVerbatim(ir, p),
+    consumes: [],
+  },
+  'pv-toggle': {
+    sbType: 'PVToggle',
+    map: (ir, p) => copyPvFlavoredVerbatim(ir, p),
+    consumes: [],
+  },
+  'pv-radio-group': {
+    sbType: 'PVRadioGroup',
+    map: (ir, p) => copyPvFlavoredVerbatim(ir, p),
+    consumes: [],
+  },
+  'pv-spinbox': {
+    sbType: 'PVSpinbox',
+    map: (ir, p) => copyPvFlavoredVerbatim(ir, p),
+    consumes: [],
+  },
+  'pv-tabs': {
+    sbType: 'PVTabs',
+    map: (ir, p) => copyPvFlavoredVerbatim(ir, p),
+    consumes: [],
+  },
+  'pv-meter': {
+    sbType: 'PVMeter',
+    map: (ir, p) => copyPvFlavoredVerbatim(ir, p),
+    consumes: [],
+  },
+  'pv-gauge': {
+    sbType: 'PVGauge',
+    map: (ir, p) => copyPvFlavoredVerbatim(ir, p),
+    consumes: [],
+  },
+  'pv-tank': {
+    sbType: 'PVTank',
+    map: (ir, p) => copyPvFlavoredVerbatim(ir, p),
+    consumes: [],
+  },
+  'pv-thermometer': {
+    sbType: 'PVThermometer',
+    map: (ir, p) => copyPvFlavoredVerbatim(ir, p),
+    consumes: [],
   },
 };
 
-// IR prop keys each known mapper already consumes — used so the generic
-// pass-through doesn't re-copy a key under its old IR name (e.g. leave a stray
-// `pv` alongside the renamed `pvName`).
-const CONSUMED_KEYS = new Set([
-  'pv',
-  'text',
-  'label',
-  'format',
-  'precision',
-  'showUnits',
-  'precisionFromPV',
-  'confirmOnWrite',
-  'confirmMessage',
-  'pressValue',
-  'releaseValue',
-  'min',
-  'max',
-  'orientation',
-  'showValue',
-  'increment',
-  'showScale',
-  'limitsFromPV',
-  'numBits',
-  'shift',
-  'bigEndian',
-  'onColor',
-  'offColor',
-  'bit',
-  'file',
-  'macros',
-  'resizeMode',
-  'src',
-  'stretchMode',
-  'title',
-  ...FOREGROUND,
-]);
+/** Copy every IR prop through verbatim, under its own key. */
+function copyVerbatim(ir: IRProps, props: WidgetProps): void {
+  for (const [k, v] of Object.entries(ir)) put(props, k, v);
+}
+
+/**
+ * Copy every IR prop through verbatim, with one tolerance: if `ir.pv` is a
+ * string and `ir.pvName` is absent, write it as `pvName` instead of `pv`
+ * (hand-authored convenience alias — these SB-native types otherwise use
+ * `pvName`, so a hand-authored IR doc using the more common `pv` key still
+ * binds correctly).
+ */
+function copyPvFlavoredVerbatim(ir: IRProps, props: WidgetProps): void {
+  for (const [k, v] of Object.entries(ir)) {
+    if (k === 'pv' && typeof v === 'string' && ir.pvName === undefined) {
+      put(props, 'pvName', v);
+    } else {
+      put(props, k, v);
+    }
+  }
+}
 
 /**
  * Map one IR widget node to its SB widget type + props.
@@ -294,10 +410,11 @@ export function mapWidget(node: WidgetNode): MapResult {
     }
   }
 
-  // Generic pass-through: keep any IR prop the mapper didn't consume, so a
-  // newer-than-SB prop survives import rather than vanishing.
+  // Generic pass-through: keep any IR prop THIS entry's mapper didn't
+  // consume, so a newer-than-SB prop survives import rather than vanishing.
+  const consumed = entry.consumes;
   for (const [key, value] of Object.entries(ir)) {
-    if (!CONSUMED_KEYS.has(key) && !(key in props)) props[key] = value;
+    if (!consumed.includes(key) && !(key in props)) props[key] = value;
   }
 
   return {
