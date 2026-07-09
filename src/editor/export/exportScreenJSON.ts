@@ -146,6 +146,14 @@ const TYPE_EXPORT_TABLE: Record<WidgetType, TypeExport> = {
     irType: (w) => (w.props.pvName !== undefined ? 'pv-button' : 'regular-button'),
     renames: PV_NAME_RENAME,
   },
+  PVShellCommand: {
+    irType: () => 'shell-command-button',
+    renames: {
+      alarmSensitiveContent: 'alarmSensitive',
+      alarmSensitiveBorder: 'alarmBorder',
+    },
+  },
+  PVWaveformPlot: { irType: () => 'waveform-plot', renames: NO_RENAMES },
   PVCheckbox: { irType: () => 'pv-checkbox', renames: PV_NAME_RENAME },
   PVDropdown: { irType: () => 'pv-enum-combobox', renames: PV_NAME_RENAME },
   PVSlider: {

@@ -91,6 +91,7 @@ export const WIDGET_CATALOG = {
     'PVTextDisplay',
     'PVTextInput',
     'PVButton',
+    'PVShellCommand',
     'PVDropdown',
     'PVCheckbox',
     'PVRadioGroup',
@@ -101,6 +102,7 @@ export const WIDGET_CATALOG = {
     'PVTabs',
   ],
   indicators: ['PVLed', 'PVByteIndicator', 'PVMeter', 'PVGauge', 'PVTank', 'PVThermometer'],
+  charts: ['PVWaveformPlot'],
   drawings: ['Rectangle', 'Ellipse', 'Line', 'Arc', 'StaticLabel', 'ScreenImage'],
   containers: ['Group', 'EmbeddedScreen'],
 } as const;
@@ -110,6 +112,7 @@ export type WidgetType = (typeof WIDGET_CATALOG)[keyof typeof WIDGET_CATALOG][nu
 export const ALL_WIDGET_TYPES: readonly WidgetType[] = [
   ...WIDGET_CATALOG.pvWrappers,
   ...WIDGET_CATALOG.indicators,
+  ...WIDGET_CATALOG.charts,
   ...WIDGET_CATALOG.drawings,
   ...WIDGET_CATALOG.containers,
 ];

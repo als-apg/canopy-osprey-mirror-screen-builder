@@ -249,6 +249,44 @@ const TYPE_MAP: Record<string, TypeMapEntry> = {
     },
     consumes: ['src', 'stretchMode'],
   },
+  'shell-command-button': {
+    sbType: 'PVShellCommand',
+    map: (ir, p) => {
+      put(p, 'command', str(ir.command));
+      put(p, 'label', str(ir.label));
+      put(p, 'showIcon', bool(ir.showIcon));
+      put(p, 'allowMultipleExecutions', bool(ir.allowMultipleExecutions));
+      put(p, 'alarmSensitiveContent', bool(ir.alarmSensitive));
+      put(p, 'alarmSensitiveBorder', bool(ir.alarmBorder));
+    },
+    consumes: [
+      'command',
+      'label',
+      'showIcon',
+      'allowMultipleExecutions',
+      'alarmSensitive',
+      'alarmBorder',
+    ],
+  },
+  'waveform-plot': {
+    sbType: 'PVWaveformPlot',
+    map: (ir, p) => {
+      put(p, 'title', str(ir.title));
+      put(p, 'curves', ir.curves);
+      put(p, 'yAxes', ir.yAxes);
+      put(p, 'xLabels', ir.xLabels);
+    },
+    consumes: ['title', 'curves', 'yAxes', 'xLabels'],
+  },
+  // A non-root QWidget panel imports as a plain Group (children + z-order
+  // survive; there is no chrome to lose).
+  'qwidget-container': {
+    sbType: 'Group',
+    map: (_ir, p) => {
+      p.layoutMode = 'absolute';
+    },
+    consumes: [],
+  },
   'related-display-button': {
     sbType: 'PVButton',
     // `file`/`macros` are turned into an open_display Action by mapWidget, not

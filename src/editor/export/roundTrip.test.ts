@@ -191,10 +191,12 @@ const EXPECTED_REGISTERED_TYPES: WidgetType[] = [
   'PVMeter',
   'PVProgressBar',
   'PVRadioGroup',
+  'PVShellCommand',
   'PVSlider',
   'PVTextDisplay',
   'PVTextInput',
   'PVToggle',
+  'PVWaveformPlot',
   'Rectangle',
   'ScreenImage',
   'StaticLabel',
@@ -230,7 +232,7 @@ function buildExerciseProps(def: WidgetDefinition): Widget['props'] {
 }
 
 describe('registry-driven per-type round trip', () => {
-  it('registers exactly the expected 19 widget types', () => {
+  it('registers exactly the expected 21 widget types', () => {
     const registered = widgetRegistry
       .getAll()
       .map((d) => d.type)
