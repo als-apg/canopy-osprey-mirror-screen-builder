@@ -10,7 +10,9 @@ describe('registerBuiltinWidgets', () => {
   it.each([
     'PVDropdown',
     'PVCheckbox',
+    'PVRadioGroup',
     'PVByteIndicator',
+    'PVMeter',
     'ScreenImage',
     // Plus the long-standing set, as a sanity check.
     'PVTextDisplay',

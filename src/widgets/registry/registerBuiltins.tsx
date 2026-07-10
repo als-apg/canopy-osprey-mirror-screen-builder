@@ -12,9 +12,11 @@ import {
   CarbonPVDropdown,
   CarbonPVCheckbox,
   CarbonPVByteIndicator,
+  CarbonPVRadioGroup,
 } from '../pv-wrappers/CarbonWidgets';
 import { LineWidget } from '../drawing/LineWidget';
 import { ScreenImageWidget } from '../drawing/ScreenImageWidget';
+import { PVMeterWidget } from '../indicators/PVMeterWidget';
 import { useFitText } from '../shared/useFitText';
 import { ArcWidget } from '../drawing/ArcWidget';
 
@@ -317,6 +319,31 @@ export function registerBuiltinWidgets() {
   });
 
   widgetRegistry.register({
+    type: 'PVRadioGroup',
+    label: 'Radio Group',
+    category: 'input',
+    icon: 'RadioButton',
+    defaultLayout: { x: 0, y: 0, width: 160, height: 96 },
+    defaultProps: { orientation: 'vertical' },
+    component: CarbonPVRadioGroup,
+    propsSchema: [
+      pvSchema,
+      { key: 'label', label: 'Label', type: 'string', section: 'display' },
+      {
+        key: 'orientation',
+        label: 'Orientation',
+        type: 'select',
+        section: 'display',
+        options: [
+          { label: 'Vertical', value: 'vertical' },
+          { label: 'Horizontal', value: 'horizontal' },
+        ],
+      },
+      ...alarmSchemas,
+    ],
+  });
+
+  widgetRegistry.register({
     type: 'PVCheckbox',
     label: 'Checkbox',
     category: 'input',
@@ -363,6 +390,25 @@ export function registerBuiltinWidgets() {
       { key: 'maxValue', label: 'Max', type: 'number', section: 'behavior' },
       ...alarmSchemas,
       ...appearanceSchemas,
+    ],
+  });
+
+  widgetRegistry.register({
+    type: 'PVMeter',
+    label: 'Meter',
+    category: 'indicator',
+    icon: 'Meter',
+    defaultLayout: { x: 0, y: 0, width: 160, height: 100 },
+    defaultProps: { minValue: 0, maxValue: 100, showValueLabel: true, alarmSensitiveBorder: true },
+    component: PVMeterWidget,
+    propsSchema: [
+      pvSchema,
+      { key: 'label', label: 'Label', type: 'string', section: 'display' },
+      { key: 'showValueLabel', label: 'Show Value', type: 'boolean', section: 'display' },
+      { key: 'units', label: 'Units', type: 'string', section: 'display' },
+      { key: 'minValue', label: 'Min', type: 'number', section: 'behavior' },
+      { key: 'maxValue', label: 'Max', type: 'number', section: 'behavior' },
+      ...alarmSchemas,
     ],
   });
 
@@ -465,6 +511,7 @@ export function registerBuiltinWidgets() {
     defaultProps: {
       lineColor: '#6f6f6f',
       lineWidth: 2,
+      fill: false,
       startAngle: 0,
       spanAngle: 90,
     },
@@ -479,6 +526,8 @@ export function registerBuiltinWidgets() {
         min: 0,
         max: 20,
       },
+      { key: 'fill', label: 'Fill', type: 'boolean', section: 'appearance' },
+      { key: 'fillColor', label: 'Fill Color', type: 'color', section: 'appearance' },
       {
         key: 'startAngle',
         label: 'Start Angle',

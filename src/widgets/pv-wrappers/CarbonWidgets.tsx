@@ -1,5 +1,15 @@
 import { useState, useCallback } from 'react';
-import { TextInput, Slider, Toggle, ProgressBar, Tag, Dropdown, Checkbox } from '@carbon/react';
+import {
+  TextInput,
+  Slider,
+  Toggle,
+  ProgressBar,
+  Tag,
+  Dropdown,
+  Checkbox,
+  RadioButtonGroup,
+  RadioButton,
+} from '@carbon/react';
 import { usePV } from '../../hooks/usePV';
 import { alarmBorderStyle } from '../../theme/alarm';
 import { AlarmSeverity, AlarmSeverityName } from '../../types/widget';
@@ -426,6 +436,52 @@ export function CarbonPVByteIndicator({ layout, props }: WidgetRendererProps) {
           />
         );
       })}
+    </div>
+  );
+}
+
+/** PVRadioGroup — Carbon RadioButtonGroup bound to an enum PV */
+export function CarbonPVRadioGroup({ id, layout, props, isEditing }: WidgetRendererProps) {
+  const pv = usePV(props.pvName as string | undefined);
+  const alarmBorder = alarmBorderStyle(
+    pv.severity,
+    (props.alarmSensitiveBorder as boolean) ?? false
+  );
+  const items = (props.customItems as string[]) ?? ['Option 1', 'Option 2', 'Option 3'];
+  const orientation = (props.orientation as 'horizontal' | 'vertical') ?? 'vertical';
+  const valueSelected = pv.connected ? String(pv.value) : undefined;
+  const disabled = !pv.connected && !!props.pvName;
+
+  const handleChange = useCallback(
+    (selection: string | number | undefined) => {
+      if (!isEditing && (typeof selection === 'string' || typeof selection === 'number')) {
+        pv.put(String(selection));
+      }
+    },
+    [isEditing, pv]
+  );
+
+  return (
+    <div style={{ width: layout.width, height: layout.height, overflow: 'hidden', ...alarmBorder }}>
+      <RadioButtonGroup
+        name={`pv-radio-${id}`}
+        legendText={(props.label as string) ?? ''}
+        orientation={orientation}
+        valueSelected={valueSelected}
+        onChange={handleChange}
+        disabled={disabled}
+        readOnly={isEditing}
+      >
+        {items.map((item) => (
+          <RadioButton
+            key={item}
+            id={`pv-radio-${id}-${item}`}
+            labelText={item}
+            value={item}
+            disabled={disabled}
+          />
+        ))}
+      </RadioButtonGroup>
     </div>
   );
 }
