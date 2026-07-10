@@ -16,9 +16,11 @@
 //    with the action carried in the reserved `actions` prop (see below) —
 //    never as `related-display-button` again.
 //  - An `unknown-widget` placeholder imports as a `Rectangle` carrying
-//    `originalClass`/`originalProps`/`warnings` as plain props; it re-emits as
-//    a plain `'rectangle'`, keeping those props verbatim (no special-casing on
-//    export — they ride through like any other prop).
+//    `originalClass`/`originalProps` as plain props; it re-emits as a plain
+//    `'rectangle'`, keeping those props verbatim (no special-casing on
+//    export — they ride through like any other prop). Its converter-stamped
+//    node-level `warnings` ride on `Widget.warnings` — like every other
+//    type — and re-emit at the node level, not as a prop.
 //  - Prop keys within each node (and the root) are emitted ALPHABETICALLY
 //    SORTED, regardless of insertion order.
 //  - Sibling arrays (root children, and each container's children) are
@@ -65,6 +67,12 @@ export class ExportError extends Error {
 export interface ExportOptions {
   /** Injectable timestamp for deterministic output (tests). Defaults to `new Date().toISOString()`. */
   savedAt?: string;
+  /**
+   * Derive the document id fresh from the title, ignoring `meta.screenId` —
+   * Save As semantics: a forked copy gets its own identity instead of
+   * inheriting (and colliding with) the original's id.
+   */
+  freshId?: boolean;
 }
 
 /**
@@ -314,6 +322,10 @@ function buildWidgetNode(widget: Widget, widgets: Record<string, Widget>): PropB
     node.meta = { comment };
   }
 
+  if (widget.warnings && widget.warnings.length > 0) {
+    node.warnings = [...widget.warnings];
+  }
+
   return node;
 }
 
@@ -383,7 +395,7 @@ export function exportScreenJSON(screen: ScreenModel, opts?: ExportOptions): Scr
   const doc: PropBag = {
     schemaVersion: SCHEMA_VERSION,
     kind: meta.screenKind ?? 'screen',
-    id: meta.screenId ?? screenIdFromTitle(meta.title),
+    id: (opts?.freshId ? undefined : meta.screenId) ?? screenIdFromTitle(meta.title),
     metadata,
     macros,
   };
@@ -396,8 +408,12 @@ export function exportScreenJSON(screen: ScreenModel, opts?: ExportOptions): Scr
   return plain as ScreenJSON;
 }
 
+/** Serialize an already-exported document: 2-space indent, trailing newline. */
+export function serializeScreenDoc(doc: ScreenJSON): string {
+  return JSON.stringify(doc, null, 2) + '\n';
+}
+
 /** Serialize a `ScreenModel` straight to a `.screen.json` string: 2-space indent, trailing newline. */
 export function serializeScreenJSON(screen: ScreenModel, opts?: ExportOptions): string {
-  const doc = exportScreenJSON(screen, opts);
-  return JSON.stringify(doc, null, 2) + '\n';
+  return serializeScreenDoc(exportScreenJSON(screen, opts));
 }

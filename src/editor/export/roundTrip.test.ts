@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { validate } from '@canopy/screen-ir';
 import { importScreenJSON } from '../import/importScreenJSON';
 import { exportScreenJSON, screenIdFromTitle, serializeScreenJSON } from './exportScreenJSON';
@@ -569,7 +569,10 @@ describe('fixture stability', () => {
     const unknownNode = doc1.root.children.find((c: { id: string }) => c.id === 'w-008');
     expect(unknownNode.type).toBe('rectangle');
     expect(unknownNode.props.originalClass).toBe('activeRectangleClass');
-    expect(unknownNode.props.warnings).toEqual([
+    // Node-level warnings stay node-level through the round trip — they are
+    // NOT flattened into the props bag.
+    expect(unknownNode.props).not.toHaveProperty('warnings');
+    expect(unknownNode.warnings).toEqual([
       'No registry entry for activeRectangleClass; rendering placeholder',
     ]);
 
@@ -652,8 +655,102 @@ describe('determinism', () => {
   });
 });
 
-// Ensure the module-scoped registration ran before any test above executes
-// (guards against test-runner reordering).
-beforeAll(() => {
-  expect(widgetRegistry.getAll().length).toBeGreaterThan(0);
+// ── 7. Converter-vocabulary pv-button binding ────────────────────────────────
+//
+// The IR's `pv` key must land on `pvName` — the key the button component and
+// its inspector schema actually read — and re-emit as `pv-button` + `pv`. A
+// mapping that round-trips on paper but binds nothing in the builder is the
+// failure mode this pins down.
+
+describe('converter-emitted pv-button', () => {
+  const buttonDoc = {
+    schemaVersion: '1.0',
+    kind: 'screen',
+    id: 'button-screen',
+    metadata: {
+      title: 'Buttons',
+      source: { type: 'edl-converter' },
+      size: { width: 200, height: 100 },
+    },
+    macros: [],
+    root: {
+      id: 'root',
+      type: 'absolute-canvas',
+      props: {},
+      geometry: { x: 0, y: 0, width: 200, height: 100 },
+      children: [
+        {
+          id: 'w-001',
+          type: 'pv-button',
+          props: { pv: 'DEV:CMD', label: 'Fire' },
+          geometry: { x: 0, y: 0, width: 100, height: 30 },
+        },
+      ],
+    },
+  };
+
+  it('imports the binding onto pvName, the key the component and inspector read', () => {
+    const { screen } = importScreenJSON(buttonDoc);
+    expect(screen.widgets['w-001'].props.pvName).toBe('DEV:CMD');
+    const inspectorKeys = widgetRegistry.get('PVButton')!.propsSchema.map((s) => s.key);
+    expect(inspectorKeys).toContain('pvName');
+  });
+
+  it('round-trips back to pv-button under the IR pv key', () => {
+    const { screen } = importScreenJSON(buttonDoc);
+    const out = exportScreenJSON(screen, { savedAt: FIXED });
+    const node = out.root.children![0];
+    expect(node.type).toBe('pv-button');
+    expect(node.props.pv).toBe('DEV:CMD');
+    expect(node.props).not.toHaveProperty('pvName');
+  });
+
+  it('a button with no control binding exports as regular-button', () => {
+    const model = mkScreen([mkWidget({ id: 'w1', type: 'PVButton', props: { label: 'Noop' } })]);
+    const doc = exportScreenJSON(model, { savedAt: FIXED });
+    expect(doc.root.children![0].type).toBe('regular-button');
+  });
+});
+
+// ── 8. Node-level warnings passthrough ───────────────────────────────────────
+
+describe('node-level warnings', () => {
+  it('survive import → save on a known widget type, node-level (not as a prop)', () => {
+    const doc = {
+      schemaVersion: '1.0',
+      kind: 'screen',
+      id: 'warned',
+      metadata: {
+        title: 'Warned',
+        source: { type: 'edl-converter' },
+        size: { width: 100, height: 100 },
+      },
+      macros: [],
+      root: {
+        id: 'root',
+        type: 'absolute-canvas',
+        props: {},
+        geometry: { x: 0, y: 0, width: 100, height: 100 },
+        children: [
+          {
+            id: 'w-001',
+            type: 'arc',
+            props: {},
+            geometry: { x: 0, y: 0, width: 40, height: 40 },
+            warnings: ['arc fill approximated'],
+          },
+        ],
+      },
+    };
+
+    const { screen, report } = importScreenJSON(doc);
+    expect(screen.widgets['w-001'].warnings).toEqual(['arc fill approximated']);
+    // Still echoed into the one-time import report as before.
+    expect(report.warnings).toContain('arc fill approximated');
+
+    const out = exportScreenJSON(screen, { savedAt: FIXED });
+    const node = out.root.children![0];
+    expect(node.warnings).toEqual(['arc fill approximated']);
+    expect(node.props).not.toHaveProperty('warnings');
+  });
 });

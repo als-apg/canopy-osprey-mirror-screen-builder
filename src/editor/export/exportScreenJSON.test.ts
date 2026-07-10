@@ -231,6 +231,35 @@ describe('exportScreenJSON — reserved carrier props', () => {
   });
 });
 
+describe('exportScreenJSON — node-level warnings', () => {
+  it('emits Widget.warnings at the node level, never as a prop', () => {
+    const model = mkScreen([
+      mkWidget({ id: 'w1', type: 'Rectangle', warnings: ['converter note'] }),
+    ]);
+    const doc = exportScreenJSON(model, { savedAt: FIXED });
+    const node = doc.root.children![0];
+    expect(node.warnings).toEqual(['converter note']);
+    expect(node.props).not.toHaveProperty('warnings');
+  });
+
+  it('omits warnings when absent or empty', () => {
+    const model = mkScreen([mkWidget({ id: 'w1', type: 'Rectangle', warnings: [] })]);
+    const doc = exportScreenJSON(model, { savedAt: FIXED });
+    expect(doc.root.children![0]).not.toHaveProperty('warnings');
+  });
+});
+
+describe('exportScreenJSON — document id', () => {
+  it('freshId re-derives the id from the title, ignoring meta.screenId', () => {
+    const model = mkScreen([mkWidget({ id: 'w1', type: 'Rectangle' })], {
+      title: 'Forked Copy',
+      screenId: 'original-id',
+    });
+    expect(exportScreenJSON(model, { savedAt: FIXED }).id).toBe('original-id');
+    expect(exportScreenJSON(model, { savedAt: FIXED, freshId: true }).id).toBe('forked-copy');
+  });
+});
+
 describe('serializeScreenJSON', () => {
   it('produces 2-space-indented JSON with a trailing newline', () => {
     const model = mkScreen([mkWidget({ id: 'w1', type: 'Rectangle' })]);

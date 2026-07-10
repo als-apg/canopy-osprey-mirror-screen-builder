@@ -434,7 +434,8 @@ function mapUnknown(node: WidgetNode, ir: IRProps): MapResult {
     originalClass,
     originalProps: ir.originalProps ?? ir,
   };
-  if (node.warnings?.length) props.warnings = [...node.warnings];
+  // Node-level `warnings` are NOT copied into props — the importer carries
+  // them on `Widget.warnings` (as for every type) so they re-emit node-level.
   return {
     sbType: 'Rectangle',
     props,

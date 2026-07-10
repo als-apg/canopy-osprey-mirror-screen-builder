@@ -217,7 +217,7 @@ export function registerBuiltinWidgets() {
     },
     component: CarbonPVButton,
     propsSchema: [
-      { key: 'controlPV', label: 'Control PV', type: 'pv', section: 'pv' },
+      { key: 'pvName', label: 'Control PV', type: 'pv', section: 'pv' },
       { key: 'readbackPV', label: 'Readback PV', type: 'pv', section: 'pv' },
       { key: 'colorPV', label: 'Color PV', type: 'pv', section: 'pv' },
       { key: 'visibilityPV', label: 'Visibility PV', type: 'pv', section: 'pv' },

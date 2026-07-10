@@ -152,6 +152,10 @@ export function importScreenJSON(json: unknown): { screen: ScreenModel; report: 
     const comment = node.meta?.comment;
     if (typeof comment === 'string' && comment !== '') widget.meta = { comment };
 
+    // Node-level warnings are durable IR data (unlike the report, which is a
+    // one-time import summary): carry them so a save re-emits them node-level.
+    if (node.warnings?.length) widget.warnings = [...node.warnings];
+
     widgets[id] = widget;
     return id;
   };

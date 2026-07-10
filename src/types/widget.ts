@@ -220,6 +220,12 @@ export interface Widget {
    * Survives save/open round trips; not editable in the UI yet.
    */
   meta?: { comment?: string };
+  /**
+   * IR `WidgetNode.warnings` passthrough (converter-stamped notes, e.g.
+   * degrade details). Survives save/open round trips; also echoed into the
+   * import report each time the document is opened.
+   */
+  warnings?: string[];
 }
 
 // ── Screen Model ──────────────────��──────────────────────────────────────────

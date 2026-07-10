@@ -10,18 +10,9 @@
 import { useCallback } from 'react';
 import Editor, { type Monaco } from '@monaco-editor/react';
 import { useEditorStore } from '../model/EditorStore';
+import { suggestedBase } from '../model/fileNames';
 import { generateTSX } from './generateTSX';
 import './CodeEditor.scss';
-
-/** Suggested eject filename, mirroring exportCodeFile's base-name derivation. */
-function previewName(filePath: string | null, title: string): string {
-  const base = (filePath?.split(/[/\\]/).pop() ?? '').replace(
-    /\.(screen\.json|json|tsx|ts|jsx)$/i,
-    ''
-  );
-  const fallback = title.replace(/[^a-zA-Z0-9]/g, '');
-  return `${base || fallback || 'screen'}.tsx`;
-}
 
 export function CodeEditor() {
   const screen = useEditorStore((s) => s.screen);
@@ -31,6 +22,9 @@ export function CodeEditor() {
 
   // Regenerated on every model change — Monaco is a controlled, read-only view.
   const currentCode = generateTSX(screen);
+
+  // Suggested eject filename — the same derivation exportCodeFile uses.
+  const previewName = `${suggestedBase(filePath, screen.meta.title)}.tsx`;
 
   const handleEditorMount = useCallback((_editor: unknown, monaco: Monaco) => {
     // Configure TypeScript/TSX defaults so the preview gets highlighting and
@@ -124,7 +118,7 @@ export function CodeEditor() {
           Code preview
           <span className="code-editor__note"> — one-way export; cannot be re-imported</span>
         </span>
-        <span className="code-editor__filename">{previewName(filePath, screen.meta.title)}</span>
+        <span className="code-editor__filename">{previewName}</span>
       </div>
       <div className="code-editor__body">
         <Editor

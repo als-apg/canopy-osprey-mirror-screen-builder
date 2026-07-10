@@ -39,6 +39,11 @@ describe('importScreenJSON', () => {
     expect(ph.type).toBe('Rectangle');
     expect(ph.props.originalClass).toBe('activeRectangleClass');
     expect(ph.props.originalProps).toEqual({ lineColor: 'index 3', fill: true });
+    // Node-level warnings ride on Widget.warnings (durable), not in props.
+    expect(ph.warnings).toEqual([
+      'No registry entry for activeRectangleClass; rendering placeholder',
+    ]);
+    expect(ph.props).not.toHaveProperty('warnings');
     expect(report.unknownWidgets).toContainEqual({
       originalClass: 'activeRectangleClass',
       count: 1,

@@ -17,7 +17,8 @@ import {
   ImportValidationError,
   type ImportReport,
 } from '../import/importScreenJSON';
-import { serializeScreenJSON, ExportError } from '../export/exportScreenJSON';
+import { exportScreenJSON, serializeScreenDoc, ExportError } from '../export/exportScreenJSON';
+import { sanitizeTitle, suggestedBase } from './fileNames';
 import { convertScreen, ConverterError } from '../../services/converter/convertScreen';
 
 // Minimal shape of the File System Access API used by save/open. The full
@@ -88,29 +89,29 @@ async function writeTextFile(
   }
 }
 
-/** Strip the path and any known screen suffix from filePath for a save base name. */
-function baseName(filePath: string | null): string {
-  return (filePath?.split(/[/\\]/).pop() ?? '').replace(/\.(screen\.json|json|tsx|ts|jsx)$/i, '');
-}
-
-/** The screen title reduced to a filename-safe base (existing Save As convention). */
-function sanitizeTitle(title: string): string {
-  return title.replace(/[^a-zA-Z0-9]/g, '');
-}
-
 /**
  * Shared save flow: serialize the screen to canonical IR, surfacing an
  * `ExportError` as `saveError` (nothing is written in that case), then write
  * via the picker and mark the store clean on success.
+ *
+ * The written document's id is stamped back onto `meta.screenId`, so the
+ * screen's identity is stable from the first save on — a later retitle must
+ * not silently change the id. `freshId` (Save As semantics) re-derives the id
+ * from the current title instead, so a forked copy gets its own identity
+ * rather than colliding with the original's.
  */
 async function saveScreenAs(
   suggestedName: string,
   state: EditorStore,
-  set: (fn: (s: EditorStore) => void) => void
+  set: (fn: (s: EditorStore) => void) => void,
+  opts?: { freshId?: boolean }
 ): Promise<void> {
   let json: string;
+  let docId: string;
   try {
-    json = serializeScreenJSON(state.screen);
+    const doc = exportScreenJSON(state.screen, { freshId: opts?.freshId });
+    docId = doc.id;
+    json = serializeScreenDoc(doc);
   } catch (err) {
     set((s) => {
       s.saveError =
@@ -124,6 +125,7 @@ async function saveScreenAs(
   if (!result) return;
   set((s) => {
     if (result.savedName !== null) s.filePath = result.savedName;
+    s.screen.meta.screenId = docId;
     s.isDirty = false;
     s.saveError = null;
   });
@@ -822,14 +824,14 @@ export const useEditorStore = create<EditorStore>()(
       // any known screen suffix and re-suffix with .screen.json rather than
       // ever writing IR bytes under a .tsx name.
       const state = get();
-      const base = baseName(state.filePath) || sanitizeTitle(state.screen.meta.title) || 'screen';
+      const base = suggestedBase(state.filePath, state.screen.meta.title);
       await saveScreenAs(`${base}.screen.json`, state, set);
     },
 
     async saveAsFile() {
       const state = get();
       const base = sanitizeTitle(state.screen.meta.title) || 'screen';
-      await saveScreenAs(`${base}.screen.json`, state, set);
+      await saveScreenAs(`${base}.screen.json`, state, set, { freshId: true });
     },
 
     async openFile() {
@@ -943,7 +945,7 @@ export const useEditorStore = create<EditorStore>()(
       // neither clears isDirty nor retargets filePath — the canonical file
       // stays the .screen.json.
       const state = get();
-      const base = baseName(state.filePath) || sanitizeTitle(state.screen.meta.title) || 'screen';
+      const base = suggestedBase(state.filePath, state.screen.meta.title);
       await writeTextFile(
         generateTSX(state.screen),
         `${base}.tsx`,

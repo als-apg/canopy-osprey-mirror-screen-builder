@@ -165,4 +165,24 @@ describe('save and export file flows', () => {
     expect(useEditorStore.getState().isDirty).toBe(true);
     expect(useEditorStore.getState().filePath).toBe('my_screen.screen.json');
   });
+
+  it('stamps meta.screenId on first save so a later retitle keeps the id', async () => {
+    await useEditorStore.getState().saveToFile();
+    expect(useEditorStore.getState().screen.meta.screenId).toBe('new-screen');
+
+    useEditorStore.getState().updateScreenMeta({ title: 'Renamed Later' });
+    await useEditorStore.getState().saveToFile();
+    expect((JSON.parse(written!) as { id: string }).id).toBe('new-screen');
+    expect(useEditorStore.getState().screen.meta.screenId).toBe('new-screen');
+  });
+
+  it('saveAsFile mints a fresh id from the current title (fork identity)', async () => {
+    await useEditorStore.getState().saveToFile(); // stamps 'new-screen'
+    useEditorStore.getState().updateScreenMeta({ title: 'Forked Copy' });
+    await useEditorStore.getState().saveAsFile();
+
+    expect((JSON.parse(written!) as { id: string }).id).toBe('forked-copy');
+    // The fork's identity is adopted by the open document.
+    expect(useEditorStore.getState().screen.meta.screenId).toBe('forked-copy');
+  });
 });

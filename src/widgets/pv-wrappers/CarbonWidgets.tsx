@@ -117,7 +117,9 @@ export function CarbonPVTextInput({
 
 /** PVButton — push or toggle button writing to a Control PV */
 export function CarbonPVButton({ layout, props, isEditing }: WidgetRendererProps) {
-  const controlPV = usePV(props.controlPV as string | undefined);
+  // The control binding uses the registry-wide `pvName` key — it maps to the
+  // IR's `pv` on save, so pv-button documents bind here in both directions.
+  const controlPV = usePV(props.pvName as string | undefined);
   const readbackPV = usePV(props.readbackPV as string | undefined);
   const colorPV = usePV(props.colorPV as string | undefined);
   const visibilityPV = usePV(props.visibilityPV as string | undefined);
