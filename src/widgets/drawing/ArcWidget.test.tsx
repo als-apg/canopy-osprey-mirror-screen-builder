@@ -6,15 +6,14 @@ import { ArcWidget } from './ArcWidget';
 afterEach(cleanup);
 
 // ---------------------------------------------------------------------------
-// Reference implementation of the ORIGINAL (pre-fill) ArcWidget stroke-path
-// algorithm, duplicated here on purpose. Expectations are derived from this
-// standalone copy of the legacy math (not from importing the component's
-// internals), so these tests pin today's exact rendered output rather than
-// re-deriving it from the same code path that produces it.
+// Standalone reference implementation of ArcWidget's path math, duplicated
+// here on purpose. Expectations derive from this copy (not from importing the
+// component's internals), so these tests pin the exact rendered output rather
+// than re-deriving it from the same code path that produces it.
 // ---------------------------------------------------------------------------
 
 // 0° = east (3 o'clock); positive angles sweep counterclockwise as viewed by the user.
-function legacyPolarPoint(cx: number, cy: number, rx: number, ry: number, angleDeg: number) {
+function refPolarPoint(cx: number, cy: number, rx: number, ry: number, angleDeg: number) {
   const rad = (angleDeg * Math.PI) / 180;
   return {
     x: cx + rx * Math.cos(rad),
@@ -22,7 +21,7 @@ function legacyPolarPoint(cx: number, cy: number, rx: number, ry: number, angleD
   };
 }
 
-function legacyArcPath(
+function refStrokePath(
   w: number,
   h: number,
   lineWidth: number,
@@ -40,8 +39,8 @@ function legacyArcPath(
   if (rx === 0 || ry === 0) return '';
 
   if (isFullCircle) {
-    const p0 = legacyPolarPoint(cx, cy, rx, ry, startAngle);
-    const p1 = legacyPolarPoint(cx, cy, rx, ry, startAngle + 180);
+    const p0 = refPolarPoint(cx, cy, rx, ry, startAngle);
+    const p1 = refPolarPoint(cx, cy, rx, ry, startAngle + 180);
     const sweep = span > 0 ? 1 : 0;
     return (
       `M ${p0.x} ${p0.y} ` +
@@ -50,14 +49,14 @@ function legacyArcPath(
     );
   }
 
-  const start = legacyPolarPoint(cx, cy, rx, ry, startAngle);
-  const end = legacyPolarPoint(cx, cy, rx, ry, startAngle + span);
+  const start = refPolarPoint(cx, cy, rx, ry, startAngle);
+  const end = refPolarPoint(cx, cy, rx, ry, startAngle + span);
   const largeArc = Math.abs(span) > 180 ? 1 : 0;
   const sweep = span > 0 ? 1 : 0;
   return `M ${start.x} ${start.y} A ${rx} ${ry} 0 ${largeArc} ${sweep} ${end.x} ${end.y}`;
 }
 
-// Reference implementation of the NEW fill (pie-wedge) path, built with the
+// Reference implementation of the fill (pie-wedge) path, built with the
 // identical formulas the stroke path uses.
 function expectedWedgePath(
   w: number,
@@ -77,8 +76,8 @@ function expectedWedgePath(
   if (rx === 0 || ry === 0) return '';
 
   if (isFullCircle) {
-    const p0 = legacyPolarPoint(cx, cy, rx, ry, startAngle);
-    const p1 = legacyPolarPoint(cx, cy, rx, ry, startAngle + 180);
+    const p0 = refPolarPoint(cx, cy, rx, ry, startAngle);
+    const p1 = refPolarPoint(cx, cy, rx, ry, startAngle + 180);
     const sweep = span > 0 ? 1 : 0;
     return (
       `M ${p0.x} ${p0.y} ` +
@@ -87,8 +86,8 @@ function expectedWedgePath(
     );
   }
 
-  const start = legacyPolarPoint(cx, cy, rx, ry, startAngle);
-  const end = legacyPolarPoint(cx, cy, rx, ry, startAngle + span);
+  const start = refPolarPoint(cx, cy, rx, ry, startAngle);
+  const end = refPolarPoint(cx, cy, rx, ry, startAngle + span);
   const largeArc = Math.abs(span) > 180 ? 1 : 0;
   const sweep = span > 0 ? 1 : 0;
   return `M ${cx} ${cy} L ${start.x} ${start.y} A ${rx} ${ry} 0 ${largeArc} ${sweep} ${end.x} ${end.y} Z`;
@@ -123,7 +122,7 @@ describe('ArcWidget', () => {
     expect(paths.length).toBe(1);
 
     const path = paths[0];
-    expect(path.getAttribute('d')).toBe(legacyArcPath(80, 80, 2, 0, 90));
+    expect(path.getAttribute('d')).toBe(refStrokePath(80, 80, 2, 0, 90));
     expect(path.getAttribute('fill')).toBe('none');
     expect(path.getAttribute('stroke')).toBe('#6f6f6f');
     expect(path.getAttribute('stroke-width')).toBe('2');
@@ -141,7 +140,7 @@ describe('ArcWidget', () => {
 
     const paths = container.querySelectorAll('path');
     expect(paths.length).toBe(1);
-    expect(paths[0].getAttribute('d')).toBe(legacyArcPath(80, 80, 2, 0, 90));
+    expect(paths[0].getAttribute('d')).toBe(refStrokePath(80, 80, 2, 0, 90));
   });
 
   it('renders a wedge fill beneath an unchanged stroke path when fill is true', () => {
@@ -166,7 +165,7 @@ describe('ArcWidget', () => {
     expect(fillEl.getAttribute('fill')).toBe('#fa4d56');
     expect(fillEl.getAttribute('stroke')).toBe('none');
 
-    expect(strokeEl.getAttribute('d')).toBe(legacyArcPath(80, 80, 2, 0, 90));
+    expect(strokeEl.getAttribute('d')).toBe(refStrokePath(80, 80, 2, 0, 90));
     expect(strokeEl.getAttribute('fill')).toBe('none');
     expect(strokeEl.getAttribute('stroke')).toBe('#6f6f6f');
   });
@@ -198,7 +197,7 @@ describe('ArcWidget', () => {
     const paths = container.querySelectorAll('path');
     expect(paths.length).toBe(2);
 
-    const expectedClosed = legacyArcPath(80, 80, 2, 0, 360);
+    const expectedClosed = refStrokePath(80, 80, 2, 0, 360);
     expect(expectedWedgePath(80, 80, 2, 0, 360)).toBe(expectedClosed);
 
     expect(paths[0].getAttribute('d')).toBe(expectedClosed);
@@ -222,7 +221,7 @@ describe('ArcWidget', () => {
     // Confirm this expectation string actually encodes sweep=0.
     expect(expectedWedgePath(80, 80, 2, 0, -90)).toContain(' 0 0 ');
 
-    expect(paths[1].getAttribute('d')).toBe(legacyArcPath(80, 80, 2, 0, -90));
+    expect(paths[1].getAttribute('d')).toBe(refStrokePath(80, 80, 2, 0, -90));
   });
 
   it('sets the large-arc flag for spanAngle 270 and matches the wedge formula', () => {
@@ -241,7 +240,7 @@ describe('ArcWidget', () => {
     const expectedWedge = expectedWedgePath(80, 80, 2, 0, 270);
     expect(expectedWedge).toContain(' 1 1 ');
     expect(paths[0].getAttribute('d')).toBe(expectedWedge);
-    expect(paths[1].getAttribute('d')).toBe(legacyArcPath(80, 80, 2, 0, 270));
+    expect(paths[1].getAttribute('d')).toBe(refStrokePath(80, 80, 2, 0, 270));
   });
 
   it('renders no paths for a zero-size layout without throwing', () => {

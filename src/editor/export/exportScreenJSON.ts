@@ -166,6 +166,19 @@ const TYPE_EXPORT_TABLE: Record<WidgetType, TypeExport> = {
     renames: { pvName: 'pv', startBit: 'shift' },
   },
   PVLed: { irType: () => 'pv-led', renames: PV_NAME_RENAME },
+  PVMeter: {
+    irType: () => 'pv-meter',
+    renames: {
+      pvName: 'pv',
+      minValue: 'min',
+      maxValue: 'max',
+      showValueLabel: 'showValue',
+    },
+  },
+  PVRadioGroup: {
+    irType: () => 'pv-radio-group',
+    renames: { pvName: 'pv', alarmSensitiveBorder: 'alarmSensitive' },
+  },
   EmbeddedScreen: { irType: () => 'embedded-display', renames: NO_RENAMES },
   ScreenImage: { irType: () => 'image-view', renames: { filename: 'src' } },
   // Identity-imported types (see `irWidgetMap.ts`'s "Identity entries" section)
@@ -178,10 +191,8 @@ const TYPE_EXPORT_TABLE: Record<WidgetType, TypeExport> = {
   Arc: { irType: () => 'arc', renames: NO_RENAMES },
   Line: { irType: () => 'line', renames: NO_RENAMES },
   PVToggle: { irType: () => 'pv-toggle', renames: NO_RENAMES },
-  PVRadioGroup: { irType: () => 'pv-radio-group', renames: NO_RENAMES },
   PVSpinbox: { irType: () => 'pv-spinbox', renames: NO_RENAMES },
   PVTabs: { irType: () => 'pv-tabs', renames: NO_RENAMES },
-  PVMeter: { irType: () => 'pv-meter', renames: NO_RENAMES },
   PVGauge: { irType: () => 'pv-gauge', renames: NO_RENAMES },
   PVTank: { irType: () => 'pv-tank', renames: NO_RENAMES },
   PVThermometer: { irType: () => 'pv-thermometer', renames: NO_RENAMES },

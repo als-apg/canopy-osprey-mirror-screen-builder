@@ -163,6 +163,7 @@ const TYPE_MAP: Record<string, TypeMapEntry> = {
       put(p, 'orientation', ir.orientation);
       put(p, 'alarmSensitiveBorder', bool(ir.alarmSensitive));
     },
+    consumes: ['pv', 'orientation', 'alarmSensitive'],
   },
   'pv-slider': {
     sbType: 'PVSlider',
@@ -207,6 +208,7 @@ const TYPE_MAP: Record<string, TypeMapEntry> = {
       put(p, 'showValueLabel', bool(ir.showValue));
       put(p, 'units', str(ir.units));
     },
+    consumes: ['pv', 'min', 'max', 'label', 'showValue', 'units'],
   },
   'pv-byte-led': {
     sbType: 'PVByteIndicator',
@@ -330,11 +332,6 @@ const TYPE_MAP: Record<string, TypeMapEntry> = {
     map: (ir, p) => copyPvFlavoredVerbatim(ir, p),
     consumes: [],
   },
-  'pv-radio-group': {
-    sbType: 'PVRadioGroup',
-    map: (ir, p) => copyPvFlavoredVerbatim(ir, p),
-    consumes: [],
-  },
   'pv-spinbox': {
     sbType: 'PVSpinbox',
     map: (ir, p) => copyPvFlavoredVerbatim(ir, p),
@@ -342,11 +339,6 @@ const TYPE_MAP: Record<string, TypeMapEntry> = {
   },
   'pv-tabs': {
     sbType: 'PVTabs',
-    map: (ir, p) => copyPvFlavoredVerbatim(ir, p),
-    consumes: [],
-  },
-  'pv-meter': {
-    sbType: 'PVMeter',
     map: (ir, p) => copyPvFlavoredVerbatim(ir, p),
     consumes: [],
   },
