@@ -13,12 +13,14 @@ import {
   CarbonPVCheckbox,
   CarbonPVByteIndicator,
   CarbonPVRadioGroup,
+  CarbonPVShellCommand,
 } from '../pv-wrappers/CarbonWidgets';
 import { LineWidget } from '../drawing/LineWidget';
 import { ScreenImageWidget } from '../drawing/ScreenImageWidget';
 import { PVMeterWidget } from '../indicators/PVMeterWidget';
 import { useFitText } from '../shared/useFitText';
 import { ArcWidget } from '../drawing/ArcWidget';
+import { PVWaveformPlot } from '../charts/PVWaveformPlot';
 
 // ── Shared prop schemas ─────────────────────────────────────────────────────
 
@@ -657,5 +659,33 @@ export function registerBuiltinWidgets() {
         ],
       },
     ],
+  });
+
+  widgetRegistry.register({
+    type: 'PVShellCommand',
+    label: 'Shell Command',
+    category: 'input',
+    icon: 'Terminal',
+    defaultLayout: { x: 0, y: 0, width: 120, height: 32 },
+    defaultProps: { label: 'Run', showIcon: false },
+    component: CarbonPVShellCommand,
+    propsSchema: [
+      { key: 'command', label: 'Command', type: 'string', section: 'behavior' },
+      { key: 'label', label: 'Label', type: 'string', section: 'display' },
+      { key: 'showIcon', label: 'Show Icon', type: 'boolean', section: 'display' },
+      ...alarmSchemas,
+      ...appearanceSchemas,
+    ],
+  });
+
+  widgetRegistry.register({
+    type: 'PVWaveformPlot',
+    label: 'Waveform Plot',
+    category: 'chart',
+    icon: 'ChartLine',
+    defaultLayout: { x: 0, y: 0, width: 400, height: 300 },
+    defaultProps: { title: '' },
+    component: PVWaveformPlot,
+    propsSchema: [{ key: 'title', label: 'Title', type: 'string', section: 'display' }],
   });
 }

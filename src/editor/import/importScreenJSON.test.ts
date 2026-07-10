@@ -293,3 +293,84 @@ describe('importScreenJSON — new passthrough/carrier behaviors', () => {
     ).toBe(true);
   });
 });
+
+describe('importScreenJSON — newly supported .ui widgets', () => {
+  function docWith(child: Record<string, unknown>) {
+    return {
+      schemaVersion: '1.0',
+      kind: 'screen',
+      id: 'newly',
+      metadata: {
+        title: 'Newly Supported',
+        source: { type: 'ui-converter' },
+        size: { width: 500, height: 400 },
+      },
+      root: {
+        id: 'w-001',
+        type: 'absolute-canvas',
+        props: {},
+        geometry: { x: 0, y: 0, width: 500, height: 400 },
+        children: [child],
+      },
+    };
+  }
+
+  it('imports a shell-command-button as PVShellCommand with command + label', () => {
+    const { screen, report } = importScreenJSON(
+      docWith({
+        id: 'w-002',
+        type: 'shell-command-button',
+        props: { command: 'probe ${P}', label: 'Probe...', showIcon: false, alarmBorder: true },
+        geometry: { x: 10, y: 10, width: 120, height: 24 },
+      })
+    );
+    const w = screen.widgets['w-002'];
+    expect(w.type).toBe('PVShellCommand');
+    expect(w.props.command).toBe('probe ${P}');
+    expect(w.props.label).toBe('Probe...');
+    expect(w.props.alarmSensitiveBorder).toBe(true);
+    expect(report.unknownWidgets).toEqual([]);
+  });
+
+  it('imports a waveform-plot as PVWaveformPlot preserving curves + title', () => {
+    const curves = [{ y_channel: '${P}:TEMP', color: '#e00000', lineWidth: 1 }];
+    const { screen, report } = importScreenJSON(
+      docWith({
+        id: 'w-002',
+        type: 'waveform-plot',
+        props: { title: 'Temps', curves, xLabels: ['Time'] },
+        geometry: { x: 0, y: 0, width: 260, height: 200 },
+      })
+    );
+    const w = screen.widgets['w-002'];
+    expect(w.type).toBe('PVWaveformPlot');
+    expect(w.props.title).toBe('Temps');
+    expect(w.props.curves).toEqual(curves);
+    expect(w.props.xLabels).toEqual(['Time']);
+    expect(report.unknownWidgets).toEqual([]);
+  });
+
+  it('imports a qwidget-container as a Group with its children', () => {
+    const { screen, report } = importScreenJSON(
+      docWith({
+        id: 'w-002',
+        type: 'qwidget-container',
+        props: {},
+        geometry: { x: 10, y: 10, width: 200, height: 120 },
+        children: [
+          {
+            id: 'w-003',
+            type: 'pv-label',
+            props: { pv: '${P}:RBV' },
+            geometry: { x: 20, y: 20, width: 100, height: 18 },
+          },
+        ],
+      })
+    );
+    expect(screen.widgets['w-002'].type).toBe('Group');
+    expect(screen.widgets['w-002'].children).toEqual(['w-003']);
+    expect(screen.widgets['w-003'].type).toBe('PVTextDisplay');
+    expect(screen.widgets['w-003'].parentId).toBe('w-002');
+    expect(report.unknownWidgets).toEqual([]);
+  });
+});

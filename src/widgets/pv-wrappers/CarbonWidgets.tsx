@@ -10,6 +10,7 @@ import {
   RadioButtonGroup,
   RadioButton,
 } from '@carbon/react';
+import { Terminal } from '@carbon/icons-react';
 import { usePV } from '../../hooks/usePV';
 import { alarmBorderStyle } from '../../theme/alarm';
 import { AlarmSeverity, AlarmSeverityName } from '../../types/widget';
@@ -196,6 +197,50 @@ export function CarbonPVButton({ layout, props, isEditing }: WidgetRendererProps
         padding: 0,
       }}
     >
+      {label}
+    </button>
+  );
+}
+
+/** PVShellCommand — button that runs a shell command on click */
+export function CarbonPVShellCommand({ layout, props, isEditing }: WidgetRendererProps) {
+  const command = (props.command as string) ?? '';
+  const label = (props.label as string) || 'Run';
+  const showIcon = props.showIcon === true;
+  const fontFamily = (props.fontFamily as string) || 'IBM Plex Sans, sans-serif';
+  const fontSize = (props.fontSize as number) ?? 13;
+  const foregroundColor = (props.foregroundColor as string) ?? '#161616';
+  const backgroundColor = (props.backgroundColor as string) ?? '#bbbbbb';
+
+  const handleClick = useCallback(() => {
+    // In edit mode the widget is inert (like the other editor widgets). Live
+    // shell execution is a follow-up; the command is preserved on the widget
+    // (surfaced via the button tooltip) so it round-trips through save/open.
+    if (isEditing || !command) return;
+  }, [isEditing, command]);
+
+  return (
+    <button
+      onClick={handleClick}
+      title={command || undefined}
+      style={{
+        width: layout.width,
+        height: layout.height,
+        backgroundColor,
+        color: foregroundColor,
+        fontFamily,
+        fontSize,
+        border: 'none',
+        borderRadius: 2,
+        cursor: isEditing ? 'default' : 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 4,
+        padding: 0,
+      }}
+    >
+      {showIcon && <Terminal size={16} />}
       {label}
     </button>
   );
