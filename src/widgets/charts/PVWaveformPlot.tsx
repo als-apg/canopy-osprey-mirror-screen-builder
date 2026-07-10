@@ -49,12 +49,17 @@ function asAxes(value: unknown): AxisConfig[] {
  * widget round-trips through save/open.
  */
 export function PVWaveformPlot({ layout, props }: WidgetRendererProps) {
-  const curves = asCurves(props.curves);
-  const yAxes = asAxes(props.yAxes);
+  // Memoize on the raw prop values (stable across unrelated store updates);
+  // deriving the arrays inside keeps the option identity stable so ECharts
+  // isn't re-rendered on every canvas render.
+  const rawCurves = props.curves;
+  const rawYAxes = props.yAxes;
   const title = props.title as string | undefined;
   const rawXLabels = props.xLabels;
 
   const option = useMemo(() => {
+    const curves = asCurves(rawCurves);
+    const yAxes = asAxes(rawYAxes);
     const xLabels = Array.isArray(rawXLabels) ? (rawXLabels as string[]) : [];
     const series = curves.map((c, i) => ({
       name: c.name || c.y_channel || `Curve ${i + 1}`,
@@ -88,7 +93,7 @@ export function PVWaveformPlot({ layout, props }: WidgetRendererProps) {
       legend: series.length > 1 ? { bottom: 0, textStyle: { fontSize: 9 } } : undefined,
       series,
     };
-  }, [curves, yAxes, title, rawXLabels]);
+  }, [rawCurves, rawYAxes, title, rawXLabels]);
 
   return (
     <div style={{ width: layout.width, height: layout.height, overflow: 'hidden' }}>
