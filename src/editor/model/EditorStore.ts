@@ -17,6 +17,8 @@ import {
   ImportValidationError,
   type ImportReport,
 } from '../import/importScreenJSON';
+import { exportScreenJSON, serializeScreenDoc, ExportError } from '../export/exportScreenJSON';
+import { sanitizeTitle, suggestedBase } from './fileNames';
 import { convertScreen, ConverterError } from '../../services/converter/convertScreen';
 
 // Minimal shape of the File System Access API used by save/open. The full
@@ -43,28 +45,37 @@ const fsWindow = () => window as unknown as WindowWithFS;
 
 const TSX_FILE_TYPES = [{ description: 'TSX Files', accept: { 'text/typescript': ['.tsx'] } }];
 
+// NOTE: the File System Access API rejects multi-dot extensions
+// ('.screen.json' is invalid in `accept`), so the picker filters on '.json'
+// and the canonical compound suffix rides in `suggestedName` instead.
+const SCREEN_FILE_TYPES = [
+  { description: 'Canopy Screen', accept: { 'application/json': ['.json'] } },
+];
+
 /**
- * Writes TSX to disk, preferring the File System Access API and falling back
- * to a download. On success, returns the saved file's name (or null if the
- * browser performed a download and we don't know where it landed). Returns
- * undefined if the user cancelled the picker.
+ * Writes a text file to disk, preferring the File System Access API and
+ * falling back to a download. On success, returns the saved file's name (or
+ * null if the browser performed a download and we don't know where it
+ * landed). Returns undefined if the user cancelled the picker.
  */
-async function writeTSX(
-  code: string,
-  suggestedName: string
+async function writeTextFile(
+  content: string,
+  suggestedName: string,
+  types: FSFilePickerOptions['types'],
+  mime: string
 ): Promise<{ savedName: string | null } | undefined> {
   try {
     if ('showSaveFilePicker' in window) {
       const handle = await fsWindow().showSaveFilePicker({
         suggestedName,
-        types: TSX_FILE_TYPES,
+        types,
       });
       const writable = await handle.createWritable();
-      await writable.write(code);
+      await writable.write(content);
       await writable.close();
       return { savedName: handle.name };
     }
-    const blob = new Blob([code], { type: 'text/typescript' });
+    const blob = new Blob([content], { type: mime });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -76,6 +87,45 @@ async function writeTSX(
     // User cancelled the picker.
     return undefined;
   }
+}
+
+/**
+ * Shared save flow: serialize the screen to canonical IR, surfacing an
+ * `ExportError` as `saveError` (nothing is written in that case), then write
+ * via the picker and mark the store clean on success. The written document's
+ * id is stamped onto `meta.screenId` so a later retitle can't change a saved
+ * screen's identity; `freshId` (Save As) re-derives it from the title so a
+ * fork gets its own.
+ */
+async function saveScreenAs(
+  suggestedName: string,
+  state: EditorStore,
+  set: (fn: (s: EditorStore) => void) => void,
+  opts?: { freshId?: boolean }
+): Promise<void> {
+  let json: string;
+  let docId: string;
+  try {
+    const doc = exportScreenJSON(state.screen, { freshId: opts?.freshId });
+    docId = doc.id;
+    json = serializeScreenDoc(doc);
+  } catch (err) {
+    set((s) => {
+      s.saveError =
+        err instanceof ExportError
+          ? err.errors
+          : [err instanceof Error ? err.message : String(err)];
+    });
+    return;
+  }
+  const result = await writeTextFile(json, suggestedName, SCREEN_FILE_TYPES, 'application/json');
+  if (!result) return;
+  set((s) => {
+    if (result.savedName !== null) s.filePath = result.savedName;
+    s.screen.meta.screenId = docId;
+    s.isDirty = false;
+    s.saveError = null;
+  });
 }
 
 const OPEN_FILE_TYPES = [
@@ -204,6 +254,10 @@ interface EditorState {
   lastImportReport: ImportReport | null;
   importError: string[] | null;
 
+  // Save diagnostics: exportScreenJSON validation failures. When set, the
+  // save was aborted and NO file was written.
+  saveError: string[] | null;
+
   // Selection
   selection: SelectionState;
 
@@ -297,6 +351,8 @@ interface EditorActions {
   importLegacyScreen(): Promise<void>;
   clearImportReport(): void;
   exportTSX(): string;
+  /** One-way TSX eject to disk: never clears isDirty or retargets filePath. */
+  exportCodeFile(): Promise<void>;
 
   // Clipboard
   copySelection(): void;
@@ -331,6 +387,7 @@ export const useEditorStore = create<EditorStore>()(
     isDirty: false,
     lastImportReport: null,
     importError: null,
+    saveError: null,
     selection: { selectedIds: [], hoveredId: null },
     viewport: { zoom: 1, panX: 0, panY: 0 },
     screenLoadId: 0,
@@ -759,33 +816,19 @@ export const useEditorStore = create<EditorStore>()(
     // ── File I/O ──────────────────────────────────────────────────────────
 
     async saveToFile() {
+      // Save writes the canonical IR document (.screen.json). filePath can
+      // still carry another suffix — opening a legacy .tsx sets it — so strip
+      // any known screen suffix and re-suffix with .screen.json rather than
+      // ever writing IR bytes under a .tsx name.
       const state = get();
-      // Save always writes TSX (generateTSX), so the suggested name must end in
-      // .tsx — even when filePath was inherited from a legacy import, which sets
-      // it to `.screen.json`. Otherwise we'd write TSX bytes into a .json file
-      // that the .screen.json-routed importer then fails to JSON.parse on open.
-      const base = (state.filePath?.split(/[/\\]/).pop() ?? 'screen.tsx').replace(
-        /\.(screen\.json|json|tsx|ts|jsx)$/i,
-        ''
-      );
-      const suggestedName = `${base || 'screen'}.tsx`;
-      const result = await writeTSX(generateTSX(state.screen), suggestedName);
-      if (!result) return;
-      set((s) => {
-        if (result.savedName !== null) s.filePath = result.savedName;
-        s.isDirty = false;
-      });
+      const base = suggestedBase(state.filePath, state.screen.meta.title);
+      await saveScreenAs(`${base}.screen.json`, state, set);
     },
 
     async saveAsFile() {
       const state = get();
-      const suggestedName = state.screen.meta.title.replace(/[^a-zA-Z0-9]/g, '') + '.tsx';
-      const result = await writeTSX(generateTSX(state.screen), suggestedName);
-      if (!result) return;
-      set((s) => {
-        if (result.savedName !== null) s.filePath = result.savedName;
-        s.isDirty = false;
-      });
+      const base = sanitizeTitle(state.screen.meta.title) || 'screen';
+      await saveScreenAs(`${base}.screen.json`, state, set, { freshId: true });
     },
 
     async openFile() {
@@ -886,11 +929,26 @@ export const useEditorStore = create<EditorStore>()(
       set((s) => {
         s.lastImportReport = null;
         s.importError = null;
+        s.saveError = null;
       });
     },
 
     exportTSX() {
       return generateTSX(get().screen);
+    },
+
+    async exportCodeFile() {
+      // One-way eject: the generated TSX cannot be re-imported, so this
+      // neither clears isDirty nor retargets filePath — the canonical file
+      // stays the .screen.json.
+      const state = get();
+      const base = suggestedBase(state.filePath, state.screen.meta.title);
+      await writeTextFile(
+        generateTSX(state.screen),
+        `${base}.tsx`,
+        TSX_FILE_TYPES,
+        'text/typescript'
+      );
     },
 
     // ── Clipboard ───────────────────────────────────────────────────────��──

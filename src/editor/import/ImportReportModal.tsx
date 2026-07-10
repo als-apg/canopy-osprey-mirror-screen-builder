@@ -1,6 +1,7 @@
 // Summarizes the outcome of the last screen import — what was unknown,
-// degraded, or dropped — so a lossy import is never silent. Driven entirely by
-// `lastImportReport` / `importError` on the editor store.
+// degraded, or dropped — so a lossy import is never silent. Also surfaces
+// save/export failures. Driven entirely by `lastImportReport` / `importError`
+// / `saveError` on the editor store.
 
 import { Modal, UnorderedList, ListItem } from '@carbon/react';
 import { useEditorStore } from '../model/EditorStore';
@@ -8,7 +9,23 @@ import { useEditorStore } from '../model/EditorStore';
 export function ImportReportModal() {
   const report = useEditorStore((s) => s.lastImportReport);
   const error = useEditorStore((s) => s.importError);
+  const saveError = useEditorStore((s) => s.saveError);
   const clear = useEditorStore((s) => s.clearImportReport);
+
+  // Save-error path: the screen failed IR validation on export. No file was
+  // written; the canvas is untouched.
+  if (saveError) {
+    return (
+      <Modal open passiveModal danger modalHeading="Save failed" onRequestClose={clear} size="sm">
+        <p>The screen could not be saved. No file was written.</p>
+        <UnorderedList>
+          {saveError.map((msg, i) => (
+            <ListItem key={i}>{msg}</ListItem>
+          ))}
+        </UnorderedList>
+      </Modal>
+    );
+  }
 
   // Error path: validation/converter failure. The screen was NOT replaced.
   if (error) {

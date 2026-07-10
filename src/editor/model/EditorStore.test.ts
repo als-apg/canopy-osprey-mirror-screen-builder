@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { useEditorStore } from './EditorStore';
 import type { ScreenModel, Widget } from '../../types/widget';
 import { createDefaultScreen } from '../../types/widget';
+import { importScreenJSON } from '../import/importScreenJSON';
 
 // Build a screen with a container `group` holding two children `a` and `b`,
 // plus an unrelated top-level widget `c`. Geometry is stored ABSOLUTE.
@@ -66,18 +67,32 @@ describe('moveWidgets', () => {
   });
 });
 
-describe('saveToFile name suggestion', () => {
+describe('save and export file flows', () => {
   let suggestedName: string | undefined;
+  let written: string | undefined;
+  let pickerCalls: number;
 
   beforeEach(() => {
     suggestedName = undefined;
-    // Capture the name the save picker is asked for, and no-op the write.
+    written = undefined;
+    pickerCalls = 0;
+    // Fresh default screen (title 'New Screen'), clean store.
+    useEditorStore.getState().setScreen(createDefaultScreen());
+    useEditorStore.getState().setFilePath(null);
+    useEditorStore.getState().clearImportReport();
+    // Capture the name the save picker is asked for and the bytes written.
     (window as unknown as { showSaveFilePicker: unknown }).showSaveFilePicker = vi.fn(
       async (opts: { suggestedName?: string }) => {
+        pickerCalls += 1;
         suggestedName = opts.suggestedName;
         return {
           name: opts.suggestedName ?? '',
-          createWritable: async () => ({ write: async () => {}, close: async () => {} }),
+          createWritable: async () => ({
+            write: async (data: string) => {
+              written = data;
+            },
+            close: async () => {},
+          }),
         };
       }
     );
@@ -87,21 +102,87 @@ describe('saveToFile name suggestion', () => {
     delete (window as unknown as { showSaveFilePicker?: unknown }).showSaveFilePicker;
   });
 
-  it('suggests .tsx even when filePath is a .screen.json from a legacy import', async () => {
+  it('keeps a .screen.json filePath as-is', async () => {
     useEditorStore.getState().setFilePath('vac_li04_VP.screen.json');
     await useEditorStore.getState().saveToFile();
-    expect(suggestedName).toBe('vac_li04_VP.tsx');
+    expect(suggestedName).toBe('vac_li04_VP.screen.json');
   });
 
-  it('keeps a .tsx filePath as .tsx', async () => {
+  it('re-suffixes a legacy .tsx filePath to .screen.json', async () => {
     useEditorStore.getState().setFilePath('my_screen.tsx');
     await useEditorStore.getState().saveToFile();
-    expect(suggestedName).toBe('my_screen.tsx');
+    expect(suggestedName).toBe('my_screen.screen.json');
   });
 
-  it('falls back to screen.tsx when no filePath is set', async () => {
-    useEditorStore.getState().setFilePath(null);
+  it('falls back to the sanitized title when no filePath is set', async () => {
     await useEditorStore.getState().saveToFile();
-    expect(suggestedName).toBe('screen.tsx');
+    expect(suggestedName).toBe('NewScreen.screen.json');
+  });
+
+  it('saveAsFile always suggests from the title', async () => {
+    useEditorStore.getState().setFilePath('something_else.screen.json');
+    useEditorStore.getState().updateScreenMeta({ title: 'Vacuum System' });
+    await useEditorStore.getState().saveAsFile();
+    expect(suggestedName).toBe('VacuumSystem.screen.json');
+  });
+
+  it('writes a valid IR document, marks the store clean, and adopts the saved name', async () => {
+    useEditorStore.getState().updateScreenMeta({ title: 'My Screen' }); // marks dirty
+    await useEditorStore.getState().saveToFile();
+
+    expect(written).toBeDefined();
+    expect(written!.endsWith('\n')).toBe(true);
+    const doc: unknown = JSON.parse(written!);
+    expect((doc as { schemaVersion: string }).schemaVersion).toBe('1.0');
+    // The written document must round-trip through the importer.
+    expect(() => importScreenJSON(doc)).not.toThrow();
+
+    expect(useEditorStore.getState().isDirty).toBe(false);
+    expect(useEditorStore.getState().filePath).toBe('MyScreen.screen.json');
+    expect(useEditorStore.getState().saveError).toBeNull();
+  });
+
+  it('surfaces an ExportError as saveError and writes nothing', async () => {
+    // 'bad name' violates the IR macro-name pattern (^[A-Z][A-Z0-9_]*$).
+    useEditorStore.getState().updateScreenMeta({ macros: { 'bad name': 'x' } });
+    await useEditorStore.getState().saveToFile();
+
+    const state = useEditorStore.getState();
+    expect(state.saveError).not.toBeNull();
+    expect(state.saveError!.length).toBeGreaterThan(0);
+    expect(pickerCalls).toBe(0); // aborted before the picker — no file written
+    expect(state.isDirty).toBe(true); // still dirty; nothing was saved
+  });
+
+  it('exportCodeFile writes TSX one-way: keeps isDirty and filePath untouched', async () => {
+    useEditorStore.getState().setFilePath('my_screen.screen.json');
+    useEditorStore.getState().updateScreenMeta({ title: 'My Screen' }); // marks dirty
+    await useEditorStore.getState().exportCodeFile();
+
+    expect(suggestedName).toBe('my_screen.tsx');
+    expect(written).toContain('export default function');
+    // One-way eject: the canonical file and dirty state are untouched.
+    expect(useEditorStore.getState().isDirty).toBe(true);
+    expect(useEditorStore.getState().filePath).toBe('my_screen.screen.json');
+  });
+
+  it('stamps meta.screenId on first save so a later retitle keeps the id', async () => {
+    await useEditorStore.getState().saveToFile();
+    expect(useEditorStore.getState().screen.meta.screenId).toBe('new-screen');
+
+    useEditorStore.getState().updateScreenMeta({ title: 'Renamed Later' });
+    await useEditorStore.getState().saveToFile();
+    expect((JSON.parse(written!) as { id: string }).id).toBe('new-screen');
+    expect(useEditorStore.getState().screen.meta.screenId).toBe('new-screen');
+  });
+
+  it('saveAsFile mints a fresh id from the current title (fork identity)', async () => {
+    await useEditorStore.getState().saveToFile(); // stamps 'new-screen'
+    useEditorStore.getState().updateScreenMeta({ title: 'Forked Copy' });
+    await useEditorStore.getState().saveAsFile();
+
+    expect((JSON.parse(written!) as { id: string }).id).toBe('forked-copy');
+    // The fork's identity is adopted by the open document.
+    expect(useEditorStore.getState().screen.meta.screenId).toBe('forked-copy');
   });
 });

@@ -39,6 +39,11 @@ describe('importScreenJSON', () => {
     expect(ph.type).toBe('Rectangle');
     expect(ph.props.originalClass).toBe('activeRectangleClass');
     expect(ph.props.originalProps).toEqual({ lineColor: 'index 3', fill: true });
+    // Node-level warnings ride on Widget.warnings (durable), not in props.
+    expect(ph.warnings).toEqual([
+      'No registry entry for activeRectangleClass; rendering placeholder',
+    ]);
+    expect(ph.props).not.toHaveProperty('warnings');
     expect(report.unknownWidgets).toContainEqual({
       originalClass: 'activeRectangleClass',
       count: 1,
@@ -128,5 +133,163 @@ describe('importScreenJSON', () => {
     expect(tsx).toContain('<Rectangle'); // unknown-widget placeholder
     expect(tsx).toContain('<Group'); // container
     expect(tsx).toContain('formulas:'); // formulas survive eject
+  });
+
+  it('lifts document id/kind onto meta.screenId/meta.screenKind', () => {
+    expect(screen.meta.screenId).toBe('simple');
+    expect(screen.meta.screenKind).toBe('screen');
+  });
+});
+
+describe('importScreenJSON — new passthrough/carrier behaviors', () => {
+  it('lifts a non-empty widget meta.comment onto Widget.meta', () => {
+    const doc = {
+      schemaVersion: '1.0',
+      kind: 'screen',
+      id: 'meta-comment',
+      metadata: {
+        title: 'Meta Comment',
+        source: { type: 'screen-builder', savedAt: '2026-01-01T00:00:00Z' },
+        size: { width: 100, height: 100 },
+      },
+      macros: [],
+      root: {
+        id: 'w-001',
+        type: 'absolute-canvas',
+        props: {},
+        geometry: { x: 0, y: 0, width: 100, height: 100 },
+        children: [
+          {
+            id: 'w-002',
+            type: 'rectangle',
+            props: {},
+            geometry: { x: 0, y: 0, width: 10, height: 10 },
+            meta: { comment: 'DO NOT MOVE' },
+          },
+          {
+            id: 'w-003',
+            type: 'rectangle',
+            props: {},
+            geometry: { x: 0, y: 0, width: 10, height: 10 },
+            meta: { comment: '' },
+          },
+        ],
+      },
+    };
+    const { screen } = importScreenJSON(doc);
+    expect(screen.widgets['w-002'].meta).toEqual({ comment: 'DO NOT MOVE' });
+    // An empty-string comment is not carried (nothing to preserve).
+    expect(screen.widgets['w-003'].meta).toBeUndefined();
+  });
+
+  it('lifts document-level id/kind/description/author/macroDescriptions onto meta', () => {
+    const doc = {
+      schemaVersion: '1.0',
+      kind: 'template',
+      id: 'my-template',
+      metadata: {
+        title: 'A Template',
+        source: { type: 'screen-builder', savedAt: '2026-01-01T00:00:00Z' },
+        size: { width: 100, height: 100 },
+        description: 'A description',
+        author: 'jdoe',
+      },
+      macros: [{ name: 'P', description: 'device prefix' }],
+      root: {
+        id: 'w-001',
+        type: 'absolute-canvas',
+        props: {},
+        geometry: { x: 0, y: 0, width: 100, height: 100 },
+        children: [],
+      },
+    };
+    const { screen } = importScreenJSON(doc);
+    expect(screen.meta.screenId).toBe('my-template');
+    expect(screen.meta.screenKind).toBe('template');
+    expect(screen.meta.description).toBe('A description');
+    expect(screen.meta.author).toBe('jdoe');
+    expect(screen.meta.macroDescriptions).toEqual({ P: 'device prefix' });
+  });
+
+  it('lifts reserved carrier props (name/actions/visible/rotation/locked) off a widget onto the Widget', () => {
+    const doc = {
+      schemaVersion: '1.0',
+      kind: 'screen',
+      id: 'carriers',
+      metadata: {
+        title: 'Carriers',
+        source: { type: 'screen-builder', savedAt: '2026-01-01T00:00:00Z' },
+        size: { width: 100, height: 100 },
+      },
+      macros: [],
+      root: {
+        id: 'w-001',
+        type: 'absolute-canvas',
+        props: {},
+        geometry: { x: 0, y: 0, width: 100, height: 100 },
+        children: [
+          {
+            id: 'w-002',
+            type: 'rectangle',
+            props: {
+              name: 'my custom name',
+              visible: false,
+              rotation: 45,
+              locked: true,
+              actions: [{ type: 'open_file', file: 'x.txt' }],
+            },
+            geometry: { x: 0, y: 0, width: 10, height: 10 },
+          },
+        ],
+      },
+    };
+    const { screen, report } = importScreenJSON(doc);
+    const widget = screen.widgets['w-002'];
+    expect(widget.name).toBe('my custom name');
+    expect(widget.visible).toBe(false);
+    expect(widget.rotation).toBe(45);
+    expect(widget.locked).toBe(true);
+    expect(widget.actions).toEqual([{ type: 'open_file', file: 'x.txt' }]);
+    // Carriers are lifted OUT of props, not left behind.
+    expect(widget.props).not.toHaveProperty('name');
+    expect(widget.props).not.toHaveProperty('visible');
+    expect(widget.props).not.toHaveProperty('rotation');
+    expect(widget.props).not.toHaveProperty('locked');
+    expect(widget.props).not.toHaveProperty('actions');
+    expect(report.warnings).toEqual([]);
+  });
+
+  it('keeps an unrecognized actions prop as a plain prop and warns', () => {
+    const doc = {
+      schemaVersion: '1.0',
+      kind: 'screen',
+      id: 'bad-actions',
+      metadata: {
+        title: 'Bad Actions',
+        source: { type: 'screen-builder', savedAt: '2026-01-01T00:00:00Z' },
+        size: { width: 100, height: 100 },
+      },
+      macros: [],
+      root: {
+        id: 'w-001',
+        type: 'absolute-canvas',
+        props: {},
+        geometry: { x: 0, y: 0, width: 100, height: 100 },
+        children: [
+          {
+            id: 'w-002',
+            type: 'rectangle',
+            props: { actions: 'not-a-list' },
+            geometry: { x: 0, y: 0, width: 10, height: 10 },
+          },
+        ],
+      },
+    };
+    const { screen, report } = importScreenJSON(doc);
+    expect(screen.widgets['w-002'].props.actions).toBe('not-a-list');
+    expect(screen.widgets['w-002'].actions).toEqual([]);
+    expect(
+      report.warnings.some((w) => w.includes("'actions' prop that is not a recognized action list"))
+    ).toBe(true);
   });
 });

@@ -8,10 +8,21 @@
 // The core transform is **tree → flat map**: the IR nests widgets via
 // `root.children` with absolute geometry and array-order z-order; the SB stores
 // a flat `widgets` record keyed by id with a `rootWidgetIds` list.
+//
+// The reverse direction — `ScreenModel` → IR document — lives in
+// `../export/exportScreenJSON.ts` and inverts the tables in `./irWidgetMap.ts`.
 
 import { validate, SCHEMA_VERSION } from '@canopy/screen-ir';
 import type { ScreenJSON, WidgetNode, Rule as IRRule } from '@canopy/screen-ir';
-import type { Rule, RuleExpression, ScreenModel, ScreenMeta, Widget } from '../../types/widget';
+import type {
+  Action,
+  Rule,
+  RuleExpression,
+  ScreenModel,
+  ScreenMeta,
+  Widget,
+  WidgetProps,
+} from '../../types/widget';
 import { createDefaultScreenMeta } from '../../types/widget';
 import { mapWidget } from './irWidgetMap';
 
@@ -113,25 +124,37 @@ export function importScreenJSON(json: unknown): { screen: ScreenModel; report: 
 
     const childIds = (node.children ?? []).map((child) => walk(child, id));
 
+    // Reserved carrier props: skip all lifting for unknown-widget placeholders
+    // (their props ARE the preserved original Qt props, not exporter carriers).
+    const carriers = mapped.unknown ? undefined : liftCarrierProps(mapped.props, id, report);
+
     const widget: Widget = {
       id,
       type: mapped.sbType,
-      name: `${mapped.sbType}_${id}`,
+      name: carriers?.name ?? `${mapped.sbType}_${id}`,
       layout: {
         x: node.geometry.x,
         y: node.geometry.y,
         width: node.geometry.width,
         height: node.geometry.height,
       },
-      visible: true,
-      rotation: 0,
+      visible: carriers?.visible ?? true,
+      rotation: carriers?.rotation ?? 0,
       rules: mapRules(node.rules, id, report),
-      actions: mapped.actions,
+      actions: [...mapped.actions, ...(carriers?.actions ?? [])],
       props: mapped.props,
       zIndex: zCounter++,
     };
     if (parentId) widget.parentId = parentId;
     if (childIds.length > 0) widget.children = childIds;
+    if (carriers?.locked) widget.locked = true;
+
+    const comment = node.meta?.comment;
+    if (typeof comment === 'string' && comment !== '') widget.meta = { comment };
+
+    // Node-level warnings are durable IR data (unlike the report, which is a
+    // one-time import summary): carry them so a save re-emits them node-level.
+    if (node.warnings?.length) widget.warnings = [...node.warnings];
 
     widgets[id] = widget;
     return id;
@@ -170,6 +193,14 @@ function normalizeForRead(json: unknown): unknown {
   return json;
 }
 
+/**
+ * Build `ScreenMeta` from the document's `metadata`/`macros`/`formulas`, plus
+ * IR passthrough fields (`id`, `kind`, `metadata.description/author`,
+ * `macros[].description`) so a save re-emits them unchanged. Also lifts
+ * EDITOR PRESENTATION props the exporter stashes on `root.props` (the
+ * converters never emit these — they're SB-only canvas chrome) with strict
+ * type guards; anything malformed is silently ignored rather than imported.
+ */
 function buildMeta(doc: ScreenJSON): ScreenMeta {
   const meta = createDefaultScreenMeta();
   meta.title = doc.metadata.title;
@@ -178,7 +209,124 @@ function buildMeta(doc: ScreenJSON): ScreenMeta {
   meta.macros = Object.fromEntries((doc.macros ?? []).map((m) => [m.name, m.default ?? '']));
   // Lossless: screen-level formulas are author-facing and survive eject.
   if (doc.formulas && doc.formulas.length > 0) meta.formulas = [...doc.formulas];
+
+  meta.screenId = doc.id;
+  meta.screenKind = doc.kind;
+  if (doc.metadata.description !== undefined) meta.description = doc.metadata.description;
+  if (doc.metadata.author !== undefined) meta.author = doc.metadata.author;
+  const macroDescriptions = Object.fromEntries(
+    (doc.macros ?? [])
+      .filter((m) => m.description !== undefined)
+      .map((m) => [m.name, m.description as string])
+  );
+  if (Object.keys(macroDescriptions).length > 0) meta.macroDescriptions = macroDescriptions;
+
+  const rootProps = (doc.root.props ?? {}) as Record<string, unknown>;
+  if (typeof rootProps.backgroundColor === 'string')
+    meta.backgroundColor = rootProps.backgroundColor;
+  if (typeof rootProps.gridSize === 'number') meta.gridSize = rootProps.gridSize;
+  if (typeof rootProps.showGrid === 'boolean') meta.showGrid = rootProps.showGrid;
+  if (typeof rootProps.snapToGrid === 'boolean') meta.snapToGrid = rootProps.snapToGrid;
+  if (typeof rootProps.version === 'string') meta.version = rootProps.version;
+  if (
+    rootProps.theme === 'white' ||
+    rootProps.theme === 'g10' ||
+    rootProps.theme === 'g90' ||
+    rootProps.theme === 'g100'
+  ) {
+    meta.theme = rootProps.theme;
+  }
+  if (typeof rootProps.showHorizontalScrollbar === 'boolean') {
+    meta.showHorizontalScrollbar = rootProps.showHorizontalScrollbar;
+  }
+  if (typeof rootProps.showVerticalScrollbar === 'boolean') {
+    meta.showVerticalScrollbar = rootProps.showVerticalScrollbar;
+  }
+
   return meta;
+}
+
+/**
+ * Recognized SB `Action` type discriminators — used to validate a plain
+ * `actions` prop before lifting it onto the widget as reserved carrier data.
+ */
+const KNOWN_ACTION_TYPES = new Set([
+  'open_display',
+  'write_pv',
+  'execute',
+  'open_webpage',
+  'open_file',
+]);
+
+function isActionList(value: unknown): value is Action[] {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (v) =>
+        v !== null &&
+        typeof v === 'object' &&
+        typeof (v as { type?: unknown }).type === 'string' &&
+        KNOWN_ACTION_TYPES.has((v as { type: string }).type)
+    )
+  );
+}
+
+interface LiftedCarriers {
+  name?: string;
+  actions?: Action[];
+  visible?: boolean;
+  rotation?: number;
+  locked?: boolean;
+}
+
+/**
+ * Lift the reserved carrier props (`name`, `actions`, `visible`, `rotation`,
+ * `locked`) out of a mapped widget's props bag onto the `Widget` itself —
+ * the exact inverse of what `exportScreenJSON.ts` writes. Mutates `props` in
+ * place (deleting lifted keys); malformed carriers are left as plain props
+ * (with a warning for `actions`) rather than dropped.
+ */
+function liftCarrierProps(
+  props: WidgetProps,
+  widgetId: string,
+  report: ImportReport
+): LiftedCarriers {
+  const lifted: LiftedCarriers = {};
+
+  if (typeof props.name === 'string' && props.name !== '') {
+    lifted.name = props.name;
+    delete props.name;
+  }
+
+  if ('actions' in props) {
+    if (isActionList(props.actions)) {
+      lifted.actions = props.actions;
+      delete props.actions;
+    } else {
+      report.warnings.push(
+        `widget '${widgetId}' has an 'actions' prop that is not a recognized action list; kept as a plain prop`
+      );
+    }
+  }
+
+  if (typeof props.visible === 'boolean') {
+    lifted.visible = props.visible;
+    delete props.visible;
+  }
+
+  if (typeof props.rotation === 'number' && Number.isFinite(props.rotation)) {
+    lifted.rotation = props.rotation;
+    delete props.rotation;
+  }
+
+  if (props.locked === true) {
+    lifted.locked = true;
+    delete props.locked;
+  } else if (props.locked === false) {
+    delete props.locked;
+  }
+
+  return lifted;
 }
 
 /**
@@ -188,8 +336,8 @@ function buildMeta(doc: ScreenJSON): ScreenMeta {
  * - **Conditional** rules map `conditions[].expression` → `expressions[].condition`
  *   (note the field flip), and the IR `default` is folded into a trailing
  *   catch-all `{ condition: 'true', value: default }` so its semantics survive.
- * The IR `id` is dropped (SB rules have none); `pvs` map 1:1, leaving
- * `fox://`/`${MACRO}` names literal.
+ * The IR `id` is kept verbatim on the SB rule (`Rule.id`) so a re-save re-emits
+ * it unchanged; `pvs` map 1:1, leaving `fox://`/`${MACRO}` names literal.
  */
 function mapRules(
   irRules: readonly IRRule[] | undefined,
@@ -211,6 +359,7 @@ function mapRules(
     }));
     expressions.push({ condition: 'true', value: ir.default });
     rules.push({
+      id: ir.id,
       name: ir.name,
       targetProperty: ir.targetProperty,
       outputExpression: false,

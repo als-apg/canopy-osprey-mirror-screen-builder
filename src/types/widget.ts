@@ -41,6 +41,11 @@ export interface RulePV {
 }
 
 export interface Rule {
+  /**
+   * The canonical IR rule id. Preserved verbatim through import so save
+   * re-emits it unchanged; minted deterministically on export when absent.
+   */
+  id?: string;
   name: string;
   targetProperty: string;
   outputExpression: boolean;
@@ -210,6 +215,17 @@ export interface Widget {
   parentId?: string;
   locked?: boolean;
   zIndex: number;
+  /**
+   * IR `WidgetNode.meta` passthrough (operator notes like "DO NOT MOVE").
+   * Survives save/open round trips; not editable in the UI yet.
+   */
+  meta?: { comment?: string };
+  /**
+   * IR `WidgetNode.warnings` passthrough (converter-stamped notes, e.g.
+   * degrade details). Survives save/open round trips; also echoed into the
+   * import report each time the document is opened.
+   */
+  warnings?: string[];
 }
 
 // ── Screen Model ──────────────────��──────────────────────────────────────────
@@ -233,6 +249,16 @@ export interface ScreenMeta {
   formulas?: FormulaDeclaration[];
   showHorizontalScrollbar?: boolean;
   showVerticalScrollbar?: boolean;
+  /** IR passthrough (document `id`) so saves round-trip. */
+  screenId?: string;
+  /** IR passthrough (`kind`) so saves round-trip. */
+  screenKind?: 'screen' | 'template';
+  /** IR passthrough (`metadata.description`) so saves round-trip. */
+  description?: string;
+  /** IR passthrough (`metadata.author`) so saves round-trip. */
+  author?: string;
+  /** IR passthrough (`macros[].description`, keyed by macro name) so saves round-trip. */
+  macroDescriptions?: Record<string, string>;
 }
 
 export interface ScreenModel {

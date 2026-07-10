@@ -1,85 +1,33 @@
-import { useRef, useCallback, useEffect, useState } from 'react';
+// READ-ONLY code preview of the one-way TSX eject output.
+//
+// The canonical save format is the screen IR (`*.screen.json`); TSX is a
+// one-way export produced by `generateTSX` for hand-off to React codebases.
+// This panel previews that output live as the model changes. The generated
+// `.tsx` cannot be re-imported, so the panel must never accept edits.
+// (`parseTSX` still powers opening legacy `.tsx` screens via Open File.)
+
+import { useCallback } from 'react';
 import Editor, { type Monaco } from '@monaco-editor/react';
-import type { editor } from 'monaco-editor';
 import { useEditorStore } from '../model/EditorStore';
+import { suggestedBase } from '../model/fileNames';
 import { generateTSX } from './generateTSX';
-import { parseTSX } from './parseTSX';
 import './CodeEditor.scss';
 
 export function CodeEditor() {
   const screen = useEditorStore((s) => s.screen);
-  const setScreen = useEditorStore((s) => s.setScreen);
+  const filePath = useEditorStore((s) => s.filePath);
   const editorTheme = useEditorStore((s) => s.editorTheme);
   const isDark = editorTheme === 'g90' || editorTheme === 'g100';
 
-  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
-  const [isExternalUpdate, setIsExternalUpdate] = useState(false);
-  const lastModelVersion = useRef(0);
-  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Generate TSX from current model
+  // Regenerated on every model change — Monaco is a controlled, read-only view.
   const currentCode = generateTSX(screen);
 
-  // Track model version to detect canvas-side changes
-  const modelVersion = JSON.stringify({
-    meta: screen.meta,
-    ids: screen.rootWidgetIds,
-    widgets: Object.fromEntries(
-      Object.entries(screen.widgets).map(([k, v]) => [k, { ...v, zIndex: 0 }])
-    ),
-  });
+  // Suggested eject filename — the same derivation exportCodeFile uses.
+  const previewName = `${suggestedBase(filePath, screen.meta.title)}.tsx`;
 
-  // Update Monaco when canvas changes (but not when code editor triggered the change)
-  useEffect(() => {
-    const version = modelVersion.length;
-    if (version !== lastModelVersion.current && editorRef.current && !isExternalUpdate) {
-      const editor = editorRef.current;
-      const pos = editor.getPosition();
-      const scroll = editor.getScrollTop();
-
-      // Only update if the generated code differs from current editor content
-      const editorValue = editor.getValue();
-      const generated = generateTSX(screen);
-      if (editorValue !== generated) {
-        setIsExternalUpdate(true);
-        editor.setValue(generated);
-        if (pos) editor.setPosition(pos);
-        editor.setScrollTop(scroll);
-        setTimeout(() => setIsExternalUpdate(false), 50);
-      }
-    }
-    lastModelVersion.current = version;
-  }, [modelVersion, screen, isExternalUpdate]);
-
-  // Handle code changes from Monaco → parse back to model
-  const handleCodeChange = useCallback(
-    (value: string | undefined) => {
-      if (!value || isExternalUpdate) return;
-
-      // Debounce parsing to avoid thrashing
-      if (debounceTimer.current) clearTimeout(debounceTimer.current);
-      debounceTimer.current = setTimeout(() => {
-        try {
-          const parsed = parseTSX(value);
-          // Only update if parse succeeded and produced widgets
-          if (parsed.rootWidgetIds.length > 0 || Object.keys(parsed.widgets).length === 0) {
-            setIsExternalUpdate(true);
-            setScreen(parsed);
-            setTimeout(() => setIsExternalUpdate(false), 50);
-          }
-        } catch {
-          // Parse error — don't update model, show error in Monaco
-          // (Monaco's own TSX validation will show syntax errors)
-        }
-      }, 800);
-    },
-    [setScreen, isExternalUpdate]
-  );
-
-  const handleEditorMount = useCallback((editor: editor.IStandaloneCodeEditor, monaco: Monaco) => {
-    editorRef.current = editor;
-
-    // Configure TypeScript/TSX defaults
+  const handleEditorMount = useCallback((_editor: unknown, monaco: Monaco) => {
+    // Configure TypeScript/TSX defaults so the preview gets highlighting and
+    // sensible hovers.
     monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
       jsx: monaco.languages.typescript.JsxEmit.React,
       target: monaco.languages.typescript.ScriptTarget.ESNext,
@@ -165,21 +113,23 @@ export function CodeEditor() {
   return (
     <div className="code-editor">
       <div className="code-editor__header">
-        Code Editor
-        <span className="code-editor__filename">
-          {useEditorStore.getState().filePath ?? 'untitled.tsx'}
+        <span>
+          Code preview
+          <span className="code-editor__note"> — one-way export; cannot be re-imported</span>
         </span>
+        <span className="code-editor__filename">{previewName}</span>
       </div>
       <div className="code-editor__body">
         <Editor
           height="100%"
           defaultLanguage="typescript"
-          defaultValue={currentCode}
+          value={currentCode}
           path="screen.tsx"
           theme={isDark ? 'vs-dark' : 'light'}
-          onChange={handleCodeChange}
           onMount={handleEditorMount}
           options={{
+            readOnly: true,
+            domReadOnly: true,
             minimap: { enabled: false },
             fontSize: 13,
             fontFamily: "'IBM Plex Mono', 'Fira Code', Consolas, monospace",
