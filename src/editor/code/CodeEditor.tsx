@@ -2,9 +2,8 @@
 //
 // The canonical save format is the screen IR (`*.screen.json`); TSX is a
 // one-way export produced by `generateTSX` for hand-off to React codebases.
-// This panel previews that output live as the model changes. It no longer
-// parses edits back into the model — the generated `.tsx` cannot be
-// re-imported, so an editable panel implied a round trip that does not exist.
+// This panel previews that output live as the model changes. The generated
+// `.tsx` cannot be re-imported, so the panel must never accept edits.
 // (`parseTSX` still powers opening legacy `.tsx` screens via Open File.)
 
 import { useCallback } from 'react';

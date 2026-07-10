@@ -92,13 +92,10 @@ async function writeTextFile(
 /**
  * Shared save flow: serialize the screen to canonical IR, surfacing an
  * `ExportError` as `saveError` (nothing is written in that case), then write
- * via the picker and mark the store clean on success.
- *
- * The written document's id is stamped back onto `meta.screenId`, so the
- * screen's identity is stable from the first save on — a later retitle must
- * not silently change the id. `freshId` (Save As semantics) re-derives the id
- * from the current title instead, so a forked copy gets its own identity
- * rather than colliding with the original's.
+ * via the picker and mark the store clean on success. The written document's
+ * id is stamped onto `meta.screenId` so a later retitle can't change a saved
+ * screen's identity; `freshId` (Save As) re-derives it from the title so a
+ * fork gets its own.
  */
 async function saveScreenAs(
   suggestedName: string,

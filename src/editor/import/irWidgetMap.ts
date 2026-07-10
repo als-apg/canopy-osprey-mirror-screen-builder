@@ -22,13 +22,11 @@
 // ride through the generic per-type prop bag like any other prop and are
 // lifted post-hoc by the importer.
 //
-// Per-entry `consumes` (added instead of one global set): each `TYPE_MAP`
-// entry declares exactly the IR prop keys ITS mapper reads, and the generic
-// pass-through in `mapWidget` only skips the CURRENT entry's consumed keys
-// (plus keys already written — the existing `key in props` check). A single
-// global "consumed" set over-dropped props: e.g. a `label` prop on `pv-label`
-// was silently discarded because a DIFFERENT type (`pv-button`) consumed
-// `label`. Scoping consumption per-type fixes that.
+// Per-entry `consumes`: each `TYPE_MAP` entry declares exactly the IR prop
+// keys ITS mapper reads, and the generic pass-through in `mapWidget` skips
+// only the current entry's consumed keys (plus keys already written). The
+// per-type scoping is load-bearing: a key one type consumes (`label` on
+// `pv-button`) must still pass through on types that don't (`pv-label`).
 
 import type { WidgetNode } from '@canopy/screen-ir';
 import type { Action, WidgetType, WidgetProps } from '../../types/widget';
@@ -96,9 +94,8 @@ interface TypeMapEntry {
 const TYPE_MAP: Record<string, TypeMapEntry> = {
   'text-label': {
     sbType: 'StaticLabel',
-    // `label` is only a fallback when `text` is absent — a node carrying BOTH
-    // keeps both (the second `put` re-adds `label` in that case, since the
-    // first `put` above only ever writes to the `text` key).
+    // `label` is only a fallback when `text` is absent; a node carrying both
+    // keeps both.
     map: (ir, p) => {
       put(p, 'text', str(ir.text) ?? str(ir.label));
       if (ir.text !== undefined && ir.label !== undefined) put(p, 'label', ir.label);
@@ -434,8 +431,6 @@ function mapUnknown(node: WidgetNode, ir: IRProps): MapResult {
     originalClass,
     originalProps: ir.originalProps ?? ir,
   };
-  // Node-level `warnings` are NOT copied into props — the importer carries
-  // them on `Widget.warnings` (as for every type) so they re-emit node-level.
   return {
     sbType: 'Rectangle',
     props,

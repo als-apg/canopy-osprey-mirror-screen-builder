@@ -408,8 +408,8 @@ describe('kitchen-sink screen', () => {
     const model = kitchenSinkScreen();
     const doc = exportScreenJSON(model, { savedAt: FIXED });
     const rootIds = (doc.root.children ?? []).map((c) => c.id);
-    // outer-group(30) then button? No — root widgets are: outer-group(30),
-    // button-1(10), display-1(5), special-1(15), embedded-1(25), placeholder-1(35)
+    // Ascending zIndex: display-1(5), button-1(10), special-1(15),
+    // embedded-1(25), outer-group(30), placeholder-1(35).
     expect(rootIds).toEqual([
       'display-1',
       'button-1',
@@ -594,14 +594,9 @@ describe('fixture stability', () => {
     ]);
   });
 
-  // NOTE ON SPEC DEVIATION: the spec text describes "the two formula-driven
-  // rules" as absent + dropped. Inspecting the actual fixture,
-  // `formula-driven.screen.json` declares exactly ONE formula-driven rule
-  // (`w-002`'s `r-001`, `formula: 'f-002'`) and one CONDITIONAL rule
-  // (`w-003`'s `r-002`, `pvs`/`conditions`) that has a normal SB
-  // representation and survives import/export intact. This assertion matches
-  // the fixture's actual content — one dropped formula-driven rule, and the
-  // conditional rule's id (`r-002`) preserved in the reimported document.
+  // The fixture declares one formula-driven rule (`w-002`'s `r-001`) with no
+  // SB representation — dropped and reported — and one conditional rule
+  // (`w-003`'s `r-002`) that survives intact.
   it('formula-driven: both formulas preserved; the formula-driven rule is absent and reported', () => {
     const r1 = importScreenJSON(formulaDrivenFixture);
     expect(r1.report.droppedRules.length).toBe(1);
