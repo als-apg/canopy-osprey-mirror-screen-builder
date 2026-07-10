@@ -1,14 +1,14 @@
 [project]
-site_name = "App"
-site_description = "Documentation for the EED Software Applications Group React project template."
+site_name = "Canopy Screen Builder"
+site_description = "Documentation for Canopy Screen Builder, a visual editor for Canopy control-system screens."
 site_author = "SLAC National Accelerator Laboratory - EED / Software Applications Group"
 #site_url = "https://www.example.com/"
 docs_dir = "docs"
 
 
 # Repository
-repo_name = "slaclab/eed-swapps-react-template"
-repo_url = "https://github.com/slaclab/eed-swapps-react-template"
+repo_name = "slaclab/canopy-screen-builder"
+repo_url = "https://github.com/slaclab/canopy-screen-builder"
 
 # ----------------------------------------------------------------------------
 # Section for configuring theme options
@@ -161,7 +161,7 @@ toggle.name = "Switch to light mode"
 # ----------------------------------------------------------------------------
 [[project.extra.social]]
 icon = "fontawesome/brands/github"
-link = "https://github.com/slaclab/eed-swapps-react-template"
+link = "https://github.com/slaclab/canopy-screen-builder"
 
 # ----------------------------------------------------------------------------
 # In this section you can configure the Markdown extensions that are used when

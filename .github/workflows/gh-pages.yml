@@ -1,4 +1,7 @@
-# This workflow will publish a new version of the documentation to the gh-pages branch
+# Builds the documentation site (zensical) and deploys it to GitHub Pages.
+# Requires the Pages source to be "GitHub Actions" (Settings -> Pages).
+# Deploy runs only for refs/heads/main; pull requests and non-main
+# workflow_dispatch runs build without publishing.
 
 name: Build & Deploy Documentation
 on:
@@ -42,7 +45,7 @@ jobs:
 
   deploy:
     needs: build
-    if: github.event_name == 'push'
+    if: github.ref == 'refs/heads/main'
 
     permissions:
       pages: write
