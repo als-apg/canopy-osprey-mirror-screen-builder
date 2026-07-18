@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { WidgetNode } from '@canopy/screen-ir';
+import type { WidgetNode } from '@slaclab/canopy-screen-ir';
 import { mapWidget } from './irWidgetMap';
 
 function node(type: string, props: WidgetNode['props']): WidgetNode {

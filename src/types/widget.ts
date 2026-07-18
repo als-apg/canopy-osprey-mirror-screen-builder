@@ -1,4 +1,4 @@
-import type { FormulaDeclaration } from '@canopy/screen-ir';
+import type { FormulaDeclaration } from '@slaclab/canopy-screen-ir';
 
 // ── Alarm ──────────────────────────────────���───────────────���─────────────────
 

@@ -38,20 +38,31 @@ Requires [pnpm](https://pnpm.io/installation).
 pnpm install
 ```
 
+#### GitHub Packages authentication
+
+`@slaclab/canopy-screen-ir` is published to [GitHub Packages](https://docs.github.com/en/packages), not the public npm registry. `.npmrc` reads the token from `NODE_AUTH_TOKEN`, so set it to a GitHub token with `read:packages` scope before installing:
+
+```sh
+export NODE_AUTH_TOKEN="$(gh auth token)"   # or a personal access token
+pnpm install
+```
+
+In CI, the workflow's built-in `secrets.GITHUB_TOKEN` supplies this (the jobs request `packages: read`); no extra secret is needed.
+
 ## Development
 
-| Command | Description |
-|---|---|
-| `pnpm dev` | Start dev server at `http://localhost:5173` |
-| `pnpm build` | Type-check and build for production |
-| `pnpm preview` | Preview production build locally |
-| `pnpm test` | Run tests once |
-| `pnpm test:watch` | Run tests in watch mode |
-| `pnpm test:coverage` | Run tests with coverage report |
-| `pnpm lint` | Run ESLint |
-| `pnpm lint:fix` | Run ESLint with auto-fix |
-| `pnpm format` | Format source files with Prettier |
-| `pnpm format:check` | Check formatting without writing |
+| Command              | Description                                 |
+| -------------------- | ------------------------------------------- |
+| `pnpm dev`           | Start dev server at `http://localhost:5173` |
+| `pnpm build`         | Type-check and build for production         |
+| `pnpm preview`       | Preview production build locally            |
+| `pnpm test`          | Run tests once                              |
+| `pnpm test:watch`    | Run tests in watch mode                     |
+| `pnpm test:coverage` | Run tests with coverage report              |
+| `pnpm lint`          | Run ESLint                                  |
+| `pnpm lint:fix`      | Run ESLint with auto-fix                    |
+| `pnpm format`        | Format source files with Prettier           |
+| `pnpm format:check`  | Check formatting without writing            |
 
 ## Documentation
 

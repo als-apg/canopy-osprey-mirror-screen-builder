@@ -12,8 +12,9 @@ export default defineConfig({
     // installed from an unbuilt GitHub tarball (no dist/), so importing it fails
     // at transform time. No current test needs DOM matchers. Add it back here
     // once that dependency is pinned to a published, built release.
-    // Scope to the app's own tests; the `@canopy/screen-ir` workspace package
-    // owns and runs its own conformance suite.
+    // Scope to the app's own tests; the `@slaclab/canopy-screen-ir` package
+    // (consumed from the canopy-sdk-js checkout) owns and runs its own
+    // conformance suite.
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
   },
 });

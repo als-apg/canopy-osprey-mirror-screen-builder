@@ -28,7 +28,7 @@
 // per-type scoping is load-bearing: a key one type consumes (`label` on
 // `pv-button`) must still pass through on types that don't (`pv-label`).
 
-import type { WidgetNode } from '@canopy/screen-ir';
+import type { WidgetNode } from '@slaclab/canopy-screen-ir';
 import type { Action, WidgetType, WidgetProps } from '../../types/widget';
 
 export interface MapResult {
