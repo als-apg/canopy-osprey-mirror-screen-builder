@@ -67,3 +67,27 @@ describe('mapWidget pv-radio-group', () => {
     expect('alarmSensitiveBorder' in r.props).toBe(false);
   });
 });
+
+describe('mapWidget polygon', () => {
+  it('maps a polygon IR node to the Polygon widget (not an unknown placeholder)', () => {
+    const r = mapWidget(
+      node('polygon', {
+        points: [
+          { x: 0, y: 0 },
+          { x: 10, y: 0 },
+          { x: 5, y: 10 },
+        ],
+        closed: true,
+        lineColor: '#6f6f6f',
+      })
+    );
+    expect(r.sbType).toBe('Polygon');
+    expect(r.unknown).toBeUndefined();
+    expect(r.props.points).toEqual([
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 5, y: 10 },
+    ]);
+    expect(r.props.closed).toBe(true);
+  });
+});

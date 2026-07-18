@@ -358,6 +358,11 @@ const TYPE_MAP: Record<string, TypeMapEntry> = {
     map: (ir, p) => copyVerbatim(ir, p),
     consumes: [],
   },
+  polygon: {
+    sbType: 'Polygon',
+    map: (ir, p) => copyVerbatim(ir, p),
+    consumes: [],
+  },
   group: {
     sbType: 'Group',
     // Verbatim — do NOT force layoutMode; the exporter/model already carries

@@ -103,7 +103,7 @@ export const WIDGET_CATALOG = {
   ],
   indicators: ['PVLed', 'PVByteIndicator', 'PVMeter', 'PVGauge', 'PVTank', 'PVThermometer'],
   charts: ['PVWaveformPlot'],
-  drawings: ['Rectangle', 'Ellipse', 'Line', 'Arc', 'StaticLabel', 'ScreenImage'],
+  drawings: ['Rectangle', 'Ellipse', 'Line', 'Arc', 'Polygon', 'StaticLabel', 'ScreenImage'],
   containers: ['Group', 'EmbeddedScreen'],
 } as const;
 

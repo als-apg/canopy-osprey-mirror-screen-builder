@@ -198,6 +198,7 @@ const TYPE_EXPORT_TABLE: Record<WidgetType, TypeExport> = {
   Ellipse: { irType: () => 'ellipse', renames: NO_RENAMES },
   Arc: { irType: () => 'arc', renames: NO_RENAMES },
   Line: { irType: () => 'line', renames: NO_RENAMES },
+  Polygon: { irType: () => 'polygon', renames: NO_RENAMES },
   PVToggle: { irType: () => 'pv-toggle', renames: NO_RENAMES },
   PVSpinbox: { irType: () => 'pv-spinbox', renames: NO_RENAMES },
   PVTabs: { irType: () => 'pv-tabs', renames: NO_RENAMES },
