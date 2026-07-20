@@ -50,11 +50,11 @@
 // no real converter ever emits props on, so there's no collision risk in
 // practice.
 
-import { SCHEMA_VERSION, validate } from '@canopy/screen-ir';
-import type { ScreenJSON } from '@canopy/screen-ir';
+import { SCHEMA_VERSION, validate } from '@slaclab/canopy-screen-ir';
+import type { ScreenJSON } from '@slaclab/canopy-screen-ir';
 import type { Rule, ScreenModel, Widget, WidgetType } from '../../types/widget';
 
-/** Thrown when the assembled document fails `@canopy/screen-ir`'s `validate()`. */
+/** Thrown when the assembled document fails `@slaclab/canopy-screen-ir`'s `validate()`. */
 export class ExportError extends Error {
   readonly errors: string[];
   constructor(errors: string[]) {

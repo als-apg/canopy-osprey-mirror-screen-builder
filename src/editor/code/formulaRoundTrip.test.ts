@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { generateTSX } from './generateTSX';
 import { parseTSX } from './parseTSX';
 import { createDefaultScreen } from '../../types/widget';
-import type { FormulaDeclaration } from '@canopy/screen-ir';
+import type { FormulaDeclaration } from '@slaclab/canopy-screen-ir';
 
 describe('formula round-trip (generateTSX ↔ parseTSX)', () => {
   it('preserves screen-level formulas through eject and re-open', () => {

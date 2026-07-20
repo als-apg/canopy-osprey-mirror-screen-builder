@@ -4,7 +4,7 @@
 // document plus server-side diagnostics. We do NOT parse `.edl`/`.ui` in the
 // browser — that's the converter's job; this just calls it.
 
-import type { ScreenJSON } from '@canopy/screen-ir';
+import type { ScreenJSON } from '@slaclab/canopy-screen-ir';
 
 /**
  * The `ScreenConversionResultDTO` returned by `POST /converter/v1/conversions`

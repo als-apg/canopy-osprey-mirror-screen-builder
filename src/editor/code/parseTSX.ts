@@ -1,5 +1,5 @@
 import { nanoid } from 'nanoid';
-import type { FormulaDeclaration } from '@canopy/screen-ir';
+import type { FormulaDeclaration } from '@slaclab/canopy-screen-ir';
 import type { ScreenModel, ScreenMeta, Widget, WidgetType, WidgetProps } from '../../types/widget';
 import { createDefaultScreen, createDefaultScreenMeta, ALL_WIDGET_TYPES } from '../../types/widget';
 

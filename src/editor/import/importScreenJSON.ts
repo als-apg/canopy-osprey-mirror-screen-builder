@@ -12,8 +12,8 @@
 // The reverse direction — `ScreenModel` → IR document — lives in
 // `../export/exportScreenJSON.ts` and inverts the tables in `./irWidgetMap.ts`.
 
-import { validate, SCHEMA_VERSION } from '@canopy/screen-ir';
-import type { ScreenJSON, WidgetNode, Rule as IRRule } from '@canopy/screen-ir';
+import { validate, SCHEMA_VERSION } from '@slaclab/canopy-screen-ir';
+import type { ScreenJSON, WidgetNode, Rule as IRRule } from '@slaclab/canopy-screen-ir';
 import type {
   Action,
   Rule,
@@ -26,7 +26,7 @@ import type {
 import { createDefaultScreenMeta } from '../../types/widget';
 import { mapWidget } from './irWidgetMap';
 
-/** Thrown when the input document fails `@canopy/screen-ir`'s `validate()`. */
+/** Thrown when the input document fails `@slaclab/canopy-screen-ir`'s `validate()`. */
 export class ImportValidationError extends Error {
   readonly errors: string[];
   constructor(errors: string[]) {

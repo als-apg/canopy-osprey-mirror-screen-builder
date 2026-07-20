@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validate } from '@canopy/screen-ir';
+import { validate } from '@slaclab/canopy-screen-ir';
 import { importScreenJSON } from '../import/importScreenJSON';
 import { exportScreenJSON, screenIdFromTitle, serializeScreenJSON } from './exportScreenJSON';
 import { widgetRegistry } from '../../widgets/registry/WidgetRegistry';
@@ -9,9 +9,9 @@ import type { Rule, ScreenMeta, ScreenModel, Widget, WidgetType } from '../../ty
 import { createDefaultScreenMeta } from '../../types/widget';
 
 import simpleFixture from '../import/__fixtures__/simple.screen.json';
-import p1WidgetsFixture from '../../../packages/screen-ir/test/fixtures/p1_widgets.screen.json';
-import formulaDrivenFixture from '../../../packages/screen-ir/test/fixtures/formula-driven.screen.json';
-import vacuumSystemFixture from '../../../packages/screen-ir/examples/vacuum-system.screen.json';
+import p1WidgetsFixture from '../import/__fixtures__/p1_widgets.screen.json';
+import formulaDrivenFixture from '../import/__fixtures__/formula-driven.screen.json';
+import vacuumSystemFixture from '../import/__fixtures__/vacuum-system.screen.json';
 
 const FIXED = '2026-07-06T00:00:00.000Z';
 

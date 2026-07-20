@@ -18,7 +18,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@canopy/screen-ir": "workspace:*",
+    "@slaclab/canopy-screen-ir": "^0.1.0",
     "@carbon/icons-react": "^11.78.0",
     "@carbon/react": "^1.105.0",
     "@monaco-editor/react": "^4.7.0",

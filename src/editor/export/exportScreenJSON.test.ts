@@ -39,8 +39,9 @@ function mkScreen(widgets: Widget[], metaOverrides: Partial<ScreenMeta> = {}): S
 
 describe('exportScreenJSON — negative / validation coverage', () => {
   it('throws ExportError on an invalid macro name', () => {
+    // A leading digit breaks the macro-name pattern.
     const model = mkScreen([mkWidget({ id: 'w1', type: 'Rectangle' })], {
-      macros: { lower: 'x' },
+      macros: { '1bad': 'x' },
     });
     expect(() => exportScreenJSON(model, { savedAt: FIXED })).toThrow(ExportError);
   });
