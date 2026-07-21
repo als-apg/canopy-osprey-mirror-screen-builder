@@ -295,6 +295,39 @@ export function Toolbar() {
         />
       </div>
 
+      <div className="toolbar__divider" />
+
+      <div className="toolbar__section">
+        <label className="toolbar__field-label" title="Screen Width (px)">
+          W
+          <input
+            type="number"
+            className="toolbar__screen-size"
+            value={screen.meta.width}
+            onChange={(e) => {
+              const val = parseInt(e.target.value);
+              if (val >= 1) updateScreenMeta({ width: val });
+            }}
+            min={1}
+            title="Screen Width (px)"
+          />
+        </label>
+        <label className="toolbar__field-label" title="Screen Height (px)">
+          H
+          <input
+            type="number"
+            className="toolbar__screen-size"
+            value={screen.meta.height}
+            onChange={(e) => {
+              const val = parseInt(e.target.value);
+              if (val >= 1) updateScreenMeta({ height: val });
+            }}
+            min={1}
+            title="Screen Height (px)"
+          />
+        </label>
+      </div>
+
       <div className="toolbar__spacer" />
 
       <div className="toolbar__section">

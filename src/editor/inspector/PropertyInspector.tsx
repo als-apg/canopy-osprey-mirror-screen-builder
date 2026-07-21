@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useState } from 'react';
 import {
   Accordion,
   AccordionItem,
@@ -8,7 +8,9 @@ import {
   Select,
   SelectItem,
   Tag,
+  Button,
 } from '@carbon/react';
+import { Add, TrashCan } from '@carbon/icons-react';
 import { useEditorStore } from '../model/EditorStore';
 import { widgetRegistry } from '../../widgets/registry/WidgetRegistry';
 import type { PropSchema } from '../../widgets/registry/WidgetRegistry';
@@ -139,6 +141,60 @@ export function PropertyInspector() {
                 }
               />
             </div>
+            <div className="property-inspector__field">
+              <Select
+                id="screen-theme"
+                labelText="Theme"
+                size="sm"
+                value={screen.meta.theme ?? 'g90'}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                  updateScreenMeta({
+                    theme: e.target.value as 'white' | 'g10' | 'g90' | 'g100',
+                  })
+                }
+              >
+                <SelectItem value="white" text="White" />
+                <SelectItem value="g10" text="Gray 10" />
+                <SelectItem value="g90" text="Gray 90" />
+                <SelectItem value="g100" text="Gray 100" />
+              </Select>
+            </div>
+          </AccordionItem>
+
+          <AccordionItem title="Grid" open>
+            <div className="property-inspector__field">
+              <NumberInput
+                id="screen-grid-size"
+                label="Grid size (px)"
+                size="sm"
+                min={1}
+                max={100}
+                value={screen.meta.gridSize}
+                onChange={(_, { value }) => {
+                  const v = Number(value);
+                  if (v >= 1 && v <= 100) updateScreenMeta({ gridSize: v });
+                }}
+                hideSteppers
+              />
+            </div>
+            <div className="property-inspector__field">
+              <Toggle
+                id="screen-show-grid"
+                labelText="Show grid"
+                size="sm"
+                toggled={screen.meta.showGrid}
+                onToggle={(checked: boolean) => updateScreenMeta({ showGrid: checked })}
+              />
+            </div>
+            <div className="property-inspector__field">
+              <Toggle
+                id="screen-snap-grid"
+                labelText="Snap to grid"
+                size="sm"
+                toggled={screen.meta.snapToGrid}
+                onToggle={(checked: boolean) => updateScreenMeta({ snapToGrid: checked })}
+              />
+            </div>
           </AccordionItem>
 
           <AccordionItem title="Scrolling" open>
@@ -164,6 +220,13 @@ export function PropertyInspector() {
                 }
               />
             </div>
+          </AccordionItem>
+
+          <AccordionItem title="Macros" open>
+            <ScreenMacrosEditor
+              macros={screen.meta.macros}
+              onChange={(next) => updateScreenMeta({ macros: next })}
+            />
           </AccordionItem>
         </Accordion>
       </div>
@@ -354,4 +417,109 @@ function PropertyField({ schema, value, onChange }: PropertyFieldProps) {
     default:
       return null;
   }
+}
+
+// ── Screen Macros Editor ────────────────────────────────────────────────────
+
+interface ScreenMacrosEditorProps {
+  macros: Record<string, string>;
+  onChange: (macros: Record<string, string>) => void;
+}
+
+function ScreenMacrosEditor({ macros, onChange }: ScreenMacrosEditorProps) {
+  const [newKey, setNewKey] = useState('');
+  const [newValue, setNewValue] = useState('');
+
+  const entries = Object.entries(macros);
+
+  const updateValue = (key: string, value: string) => {
+    onChange({ ...macros, [key]: value });
+  };
+
+  const removeKey = (key: string) => {
+    const next = { ...macros };
+    delete next[key];
+    onChange(next);
+  };
+
+  const addMacro = () => {
+    const key = newKey.trim();
+    if (!key || key in macros) return;
+    onChange({ ...macros, [key]: newValue });
+    setNewKey('');
+    setNewValue('');
+  };
+
+  return (
+    <div className="property-inspector__macros">
+      {entries.length === 0 && (
+        <div className="property-inspector__macros-empty">No macros defined</div>
+      )}
+      {entries.map(([key, value]) => (
+        <div key={key} className="property-inspector__macro-row">
+          <TextInput
+            id={`macro-key-${key}`}
+            labelText=""
+            hideLabel
+            size="sm"
+            value={key}
+            readOnly
+          />
+          <TextInput
+            id={`macro-val-${key}`}
+            labelText=""
+            hideLabel
+            size="sm"
+            value={value}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateValue(key, e.target.value)}
+          />
+          <Button
+            kind="ghost"
+            size="sm"
+            hasIconOnly
+            renderIcon={TrashCan}
+            iconDescription="Remove macro"
+            tooltipPosition="left"
+            onClick={() => removeKey(key)}
+          />
+        </div>
+      ))}
+      <div className="property-inspector__macro-row">
+        <TextInput
+          id="macro-new-key"
+          labelText=""
+          hideLabel
+          size="sm"
+          placeholder="Name"
+          value={newKey}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewKey(e.target.value)}
+          onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+            if (e.key === 'Enter') addMacro();
+          }}
+        />
+        <TextInput
+          id="macro-new-val"
+          labelText=""
+          hideLabel
+          size="sm"
+          placeholder="Value"
+          value={newValue}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewValue(e.target.value)}
+          onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+            if (e.key === 'Enter') addMacro();
+          }}
+        />
+        <Button
+          kind="ghost"
+          size="sm"
+          hasIconOnly
+          renderIcon={Add}
+          iconDescription="Add macro"
+          tooltipPosition="left"
+          onClick={addMacro}
+          disabled={!newKey.trim() || newKey.trim() in macros}
+        />
+      </div>
+    </div>
+  );
 }

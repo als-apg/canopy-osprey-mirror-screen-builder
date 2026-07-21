@@ -55,3 +55,23 @@
     background: none;
   }
 }
+
+.property-inspector__macros {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.property-inspector__macros-empty {
+  padding: 0.25rem 0;
+  font-size: 0.75rem;
+  color: var(--cds-text-secondary);
+  font-style: italic;
+}
+
+.property-inspector__macro-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 4px;
+  align-items: center;
+}
