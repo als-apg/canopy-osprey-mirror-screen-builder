@@ -434,6 +434,12 @@ interface ScreenMacrosEditorProps {
   onChange: (macros: Record<string, string>) => void;
 }
 
+const MACRO_NAME_RE = /^[A-Za-z][A-Za-z0-9_]*$/;
+
+function isValidMacroName(key: string, macros: Record<string, string>): boolean {
+  return key.length > 0 && !(key in macros) && MACRO_NAME_RE.test(key);
+}
+
 function ScreenMacrosEditor({ macros, onChange }: ScreenMacrosEditorProps) {
   const [newKey, setNewKey] = useState('');
   const [newValue, setNewValue] = useState('');
@@ -452,13 +458,7 @@ function ScreenMacrosEditor({ macros, onChange }: ScreenMacrosEditorProps) {
 
   const addMacro = () => {
     const key = newKey.trim();
-  const addMacro = () => {
-    const key = newKey.trim();
-    if (!key || key in macros || !/^[A-Za-z][A-Za-z0-9_]*$/.test(key)) return;
-    onChange({ ...macros, [key]: newValue });
-    setNewKey('');
-    setNewValue('');
-  };
+    if (!isValidMacroName(key, macros)) return;
     onChange({ ...macros, [key]: newValue });
     setNewKey('');
     setNewValue('');
@@ -531,7 +531,7 @@ function ScreenMacrosEditor({ macros, onChange }: ScreenMacrosEditorProps) {
           iconDescription="Add macro"
           tooltipPosition="left"
           onClick={addMacro}
-          disabled={!newKey.trim() || newKey.trim() in macros}
+          disabled={!isValidMacroName(newKey.trim(), macros)}
         />
       </div>
     </div>
