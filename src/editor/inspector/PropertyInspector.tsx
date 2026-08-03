@@ -444,7 +444,13 @@ function ScreenMacrosEditor({ macros, onChange }: ScreenMacrosEditorProps) {
 
   const addMacro = () => {
     const key = newKey.trim();
-    if (!key || key in macros) return;
+  const addMacro = () => {
+    const key = newKey.trim();
+    if (!key || key in macros || !/^[A-Za-z][A-Za-z0-9_]*$/.test(key)) return;
+    onChange({ ...macros, [key]: newValue });
+    setNewKey('');
+    setNewValue('');
+  };
     onChange({ ...macros, [key]: newValue });
     setNewKey('');
     setNewValue('');
