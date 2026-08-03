@@ -115,8 +115,12 @@ export function PropertyInspector() {
                 label="Width"
                 size="sm"
                 min={1}
+                max={10000}
                 value={screen.meta.width}
-                onChange={(_, { value }) => updateScreenMeta({ width: Number(value) })}
+                onChange={(_, { value }) => {
+                  const v = Number(value);
+                  if (v >= 1 && v <= 10000) updateScreenMeta({ width: v });
+                }}
                 hideSteppers
               />
               <NumberInput
@@ -124,8 +128,12 @@ export function PropertyInspector() {
                 label="Height"
                 size="sm"
                 min={1}
+                max={10000}
                 value={screen.meta.height}
-                onChange={(_, { value }) => updateScreenMeta({ height: Number(value) })}
+                onChange={(_, { value }) => {
+                  const v = Number(value);
+                  if (v >= 1 && v <= 10000) updateScreenMeta({ height: v });
+                }}
                 hideSteppers
               />
             </div>
