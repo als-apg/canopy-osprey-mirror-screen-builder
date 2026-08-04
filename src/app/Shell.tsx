@@ -1,9 +1,10 @@
 import { Header, HeaderName, HeaderGlobalBar, HeaderGlobalAction, Theme } from '@carbon/react';
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Code, Play, Light, Asleep, ChevronLeft, ChevronRight } from '@carbon/icons-react';
 import { useEditorStore } from '../editor/model/EditorStore';
 import { PVServiceProvider } from '../services/pv/PVContext';
 import { Toolbar } from '../editor/toolbar/Toolbar';
+import { TabBar } from './TabBar';
 import { WidgetPalette } from '../editor/palette/WidgetPalette';
 import { ComponentTree } from '../editor/tree/ComponentTree';
 import { PropertyInspector } from '../editor/inspector/PropertyInspector';
@@ -14,16 +15,12 @@ import { ImportReportModal } from '../editor/import/ImportReportModal';
 import './Shell.scss';
 
 export function Shell() {
-  const isDirty = useEditorStore((s) => s.isDirty);
-  const filePath = useEditorStore((s) => s.filePath);
   const panels = useEditorStore((s) => s.panels);
   const togglePanel = useEditorStore((s) => s.togglePanel);
   const mode = useEditorStore((s) => s.mode);
   const setMode = useEditorStore((s) => s.setMode);
   const editorTheme = useEditorStore((s) => s.editorTheme);
   const setEditorTheme = useEditorStore((s) => s.setEditorTheme);
-  const screen = useEditorStore((s) => s.screen);
-  const updateScreenMeta = useEditorStore((s) => s.updateScreenMeta);
 
   const isDark = editorTheme === 'g90' || editorTheme === 'g100';
   const toggleTheme = () => setEditorTheme(isDark ? 'g10' : 'g90');
@@ -49,35 +46,8 @@ export function Shell() {
     };
   }, [paletteDrag, endPaletteDrag]);
 
-  const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [titleDraft, setTitleDraft] = useState('');
   const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
   const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(false);
-
-  const screenTitle = screen.meta.title;
-  const fileName = filePath ? filePath.split(/[/\\]/).pop() : null;
-  const tabLabel = `${screenTitle}${isDirty ? ' *' : ''}`;
-
-  const handleTitleDoubleClick = useCallback(() => {
-    setTitleDraft(screenTitle);
-    setIsEditingTitle(true);
-  }, [screenTitle]);
-
-  const handleTitleCommit = useCallback(() => {
-    const trimmed = titleDraft.trim();
-    if (trimmed && trimmed !== screenTitle) {
-      updateScreenMeta({ title: trimmed });
-    }
-    setIsEditingTitle(false);
-  }, [titleDraft, screenTitle, updateScreenMeta]);
-
-  const handleTitleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter') handleTitleCommit();
-      if (e.key === 'Escape') setIsEditingTitle(false);
-    },
-    [handleTitleCommit]
-  );
 
   const isLiveOpen = panels.livePreviewOpen;
   const isSideBySide = isLiveOpen && panels.livePreviewMode === 'side-by-side';
@@ -153,35 +123,7 @@ export function Shell() {
                 <div
                   className={`shell__canvas-top ${panels.codeEditorOpen ? 'shell__canvas-top--split' : ''}`}
                 >
-                  <div className="shell__canvas-title">
-                    {isEditingTitle ? (
-                      <input
-                        className="shell__title-input"
-                        value={titleDraft}
-                        onChange={(e) => setTitleDraft(e.target.value)}
-                        onBlur={() => setTimeout(handleTitleCommit, 100)}
-                        onKeyDown={handleTitleKeyDown}
-                        ref={(el) => {
-                          if (el) {
-                            // Defer focus so the double-click mouseup doesn't steal it
-                            requestAnimationFrame(() => {
-                              el.focus();
-                              el.select();
-                            });
-                          }
-                        }}
-                      />
-                    ) : (
-                      <span
-                        className="shell__title-text"
-                        onDoubleClick={handleTitleDoubleClick}
-                        title="Double-click to rename"
-                      >
-                        {tabLabel}
-                      </span>
-                    )}
-                    {fileName && <span className="shell__file-path">{fileName}</span>}
-                  </div>
+                  <TabBar />
                   <Canvas />
                 </div>
                 {panels.codeEditorOpen && (

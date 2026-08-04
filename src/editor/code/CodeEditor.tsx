@@ -9,13 +9,14 @@
 import { useCallback } from 'react';
 import Editor, { type Monaco } from '@monaco-editor/react';
 import { useEditorStore } from '../model/EditorStore';
+import { useScreen, useFilePath } from '../model/hooks';
 import { suggestedBase } from '../model/fileNames';
 import { generateTSX } from './generateTSX';
 import './CodeEditor.scss';
 
 export function CodeEditor() {
-  const screen = useEditorStore((s) => s.screen);
-  const filePath = useEditorStore((s) => s.filePath);
+  const screen = useScreen();
+  const filePath = useFilePath();
   const editorTheme = useEditorStore((s) => s.editorTheme);
   const isDark = editorTheme === 'g90' || editorTheme === 'g100';
 

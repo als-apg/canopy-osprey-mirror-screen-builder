@@ -2,12 +2,13 @@ import { useState, useCallback } from 'react';
 import { Search, TreeView, TreeNode } from '@carbon/react';
 import { View, ViewOff, ChevronDown, ChevronLeft } from '@carbon/icons-react';
 import { useEditorStore } from '../model/EditorStore';
+import { useScreen, useSelection } from '../model/hooks';
 import { widgetRegistry } from '../../widgets/registry/WidgetRegistry';
 import './ComponentTree.scss';
 
 export function ComponentTree() {
-  const screen = useEditorStore((s) => s.screen);
-  const selection = useEditorStore((s) => s.selection);
+  const screen = useScreen();
+  const selection = useSelection();
   const selectWidgets = useEditorStore((s) => s.selectWidgets);
   const updateWidget = useEditorStore((s) => s.updateWidget);
   const [filter, setFilter] = useState('');

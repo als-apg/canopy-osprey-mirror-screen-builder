@@ -1,0 +1,100 @@
+.tab-bar {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 1rem 0 0;
+  font-size: 0.75rem;
+  color: var(--cds-text-secondary);
+  background-color: var(--cds-layer-01);
+  border-bottom: 1px solid var(--cds-border-subtle);
+  user-select: none;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.tab-bar__tabs {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.tab-bar__tab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 8px 0 12px;
+  border-right: 1px solid var(--cds-border-subtle);
+  color: var(--cds-text-secondary);
+  cursor: pointer;
+  min-width: 0;
+  max-width: 200px;
+  flex-shrink: 0;
+
+  &:hover {
+    background-color: var(--cds-layer-hover-01);
+  }
+
+  &--active {
+    color: var(--cds-text-primary);
+    background-color: var(--cds-layer-02);
+    box-shadow: inset 0 -2px 0 var(--pydm-selection);
+  }
+}
+
+.tab-bar__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 2px 4px;
+  border-radius: 2px;
+}
+
+.tab-bar__dirty-dot {
+  color: var(--pydm-selection);
+  font-weight: bold;
+}
+
+.tab-bar__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 2px;
+  background: transparent;
+  color: var(--cds-text-secondary);
+  cursor: pointer;
+  opacity: 0.6;
+
+  &:hover {
+    background-color: var(--cds-layer-hover-02);
+    opacity: 1;
+  }
+}
+
+.tab-bar__rename-input {
+  background: var(--cds-field-01);
+  border: 1px solid var(--pydm-selection);
+  border-radius: 2px;
+  color: var(--cds-text-primary);
+  font-size: 0.75rem;
+  padding: 2px 6px;
+  outline: none;
+  width: 140px;
+}
+
+.tab-bar__file-path {
+  font-size: 0.625rem;
+  color: var(--cds-text-helper);
+  font-family: 'IBM Plex Mono', monospace;
+  opacity: 0.7;
+  flex-shrink: 0;
+  padding-left: 8px;
+  border-left: 1px solid var(--cds-border-subtle);
+}

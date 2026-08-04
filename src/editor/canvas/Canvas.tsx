@@ -3,15 +3,16 @@ import type { ReactNode } from 'react';
 import { Theme } from '@carbon/react';
 import type { Widget } from '../../types/widget';
 import { useEditorStore } from '../model/EditorStore';
+import { useScreen, useSelection, useViewport } from '../model/hooks';
 import { widgetRegistry } from '../../widgets/registry/WidgetRegistry';
 import { WidgetOverlay } from './WidgetOverlay';
 import { SelectionMarquee } from './SelectionMarquee';
 import './Canvas.scss';
 
 export function Canvas() {
-  const screen = useEditorStore((s) => s.screen);
-  const viewport = useEditorStore((s) => s.viewport);
-  const selection = useEditorStore((s) => s.selection);
+  const screen = useScreen();
+  const viewport = useViewport();
+  const selection = useSelection();
   const mode = useEditorStore((s) => s.mode);
   const setZoom = useEditorStore((s) => s.setZoom);
   const setPan = useEditorStore((s) => s.setPan);

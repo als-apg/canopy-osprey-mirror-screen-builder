@@ -10,6 +10,7 @@ import {
   Tag,
 } from '@carbon/react';
 import { useEditorStore } from '../model/EditorStore';
+import { useScreen, useSelection } from '../model/hooks';
 import { widgetRegistry } from '../../widgets/registry/WidgetRegistry';
 import type { PropSchema } from '../../widgets/registry/WidgetRegistry';
 import './PropertyInspector.scss';
@@ -27,8 +28,8 @@ const SECTION_LABELS: Record<string, string> = {
 const SECTION_ORDER = ['identity', 'layout', 'pv', 'display', 'appearance', 'alarm', 'behavior'];
 
 export function PropertyInspector() {
-  const selection = useEditorStore((s) => s.selection);
-  const screen = useEditorStore((s) => s.screen);
+  const selection = useSelection();
+  const screen = useScreen();
   const updateWidget = useEditorStore((s) => s.updateWidget);
   const updateWidgetProps = useEditorStore((s) => s.updateWidgetProps);
   const updateWidgetLayout = useEditorStore((s) => s.updateWidgetLayout);

@@ -90,28 +90,32 @@ async function writeTextFile(
 }
 
 /**
- * Shared save flow: serialize the screen to canonical IR, surfacing an
- * `ExportError` as `saveError` (nothing is written in that case), then write
- * via the picker and mark the store clean on success. The written document's
- * id is stamped onto `meta.screenId` so a later retitle can't change a saved
- * screen's identity; `freshId` (Save As) re-derives it from the title so a
- * fork gets its own.
+ * Shared save flow: serialize the active tab's screen to canonical IR,
+ * surfacing an `ExportError` as `saveError` (nothing is written in that case),
+ * then write via the picker and mark the tab clean on success. The written
+ * document's id is stamped onto `meta.screenId` so a later retitle can't
+ * change a saved screen's identity; `freshId` (Save As) re-derives it from
+ * the title so a fork gets its own.
  */
-async function saveScreenAs(
+async function saveActiveTabAs(
   suggestedName: string,
   state: EditorStore,
   set: (fn: (s: EditorStore) => void) => void,
   opts?: { freshId?: boolean }
 ): Promise<void> {
+  const tab = state.tabs[state.activeTabId];
+  if (!tab) return;
   let json: string;
   let docId: string;
   try {
-    const doc = exportScreenJSON(state.screen, { freshId: opts?.freshId });
+    const doc = exportScreenJSON(tab.screen, { freshId: opts?.freshId });
     docId = doc.id;
     json = serializeScreenDoc(doc);
   } catch (err) {
     set((s) => {
-      s.saveError =
+      const t = s.tabs[s.activeTabId];
+      if (!t) return;
+      t.saveError =
         err instanceof ExportError
           ? err.errors
           : [err instanceof Error ? err.message : String(err)];
@@ -121,10 +125,12 @@ async function saveScreenAs(
   const result = await writeTextFile(json, suggestedName, SCREEN_FILE_TYPES, 'application/json');
   if (!result) return;
   set((s) => {
-    if (result.savedName !== null) s.filePath = result.savedName;
-    s.screen.meta.screenId = docId;
-    s.isDirty = false;
-    s.saveError = null;
+    const t = s.tabs[s.activeTabId];
+    if (!t) return;
+    if (result.savedName !== null) t.filePath = result.savedName;
+    t.screen.meta.screenId = docId;
+    t.isDirty = false;
+    t.saveError = null;
   });
 }
 
@@ -208,14 +214,14 @@ function isScreenJSON(name: string, code: string): boolean {
   }
 }
 
-// ── Selection State ────────────────────────────────────���─────────────────────
+// ── Selection State ─────────────────────────────────────────────────────────
 
 interface SelectionState {
   selectedIds: string[];
   hoveredId: string | null;
 }
 
-// ── Viewport State ────────────────────���───────────────────────────��──────────
+// ── Viewport State ──────────────────────────────────────────────────────────
 
 interface ViewportState {
   zoom: number;
@@ -223,7 +229,7 @@ interface ViewportState {
   panY: number;
 }
 
-// ── Panel Visibility ────────────��────────────────────────────────────────────
+// ── Panel Visibility ────────────────────────────────────────────────────────
 
 interface PanelState {
   paletteOpen: boolean;
@@ -238,71 +244,99 @@ type BooleanPanelKey = {
   [K in keyof PanelState]: PanelState[K] extends boolean ? K : never;
 }[keyof PanelState];
 
-// ── Editor Mode ──────────────���───────────────────────────────────────────────
+// ── Editor Mode ─────────────────────────────────────────────────────────────
 
 type EditorMode = 'edit' | 'live' | 'tab-order';
 
-// ── Full Store ───────────────────��────────────────────────────────���──────────
+// ── Per-Tab State ───────────────────────────────────────────────────────────
 
-interface EditorState {
-  // Screen data
+/**
+ * Everything that belongs to a single open screen (document). Panels, theme,
+ * mode, clipboard and drag state live on the top-level store since they're
+ * shared across tabs.
+ */
+export interface TabState {
+  id: string;
   screen: ScreenModel;
   filePath: string | null;
   isDirty: boolean;
-
-  // Import diagnostics (set by the last .screen.json / legacy import)
   lastImportReport: ImportReport | null;
   importError: string[] | null;
-
-  // Save diagnostics: exportScreenJSON validation failures. When set, the
-  // save was aborted and NO file was written.
   saveError: string[] | null;
-
-  // Selection
   selection: SelectionState;
-
-  // Viewport
   viewport: ViewportState;
-
-  // Bumped whenever a new screen is loaded wholesale (import/open/new); the
-  // canvas watches this to auto-fit zoom. `fitNonce` is bumped by the toolbar's
-  // Fit-to-Screen button — same fit code path, on demand.
-  screenLoadId: number;
-  fitNonce: number;
-
-  // Panels
-  panels: PanelState;
-
-  // Mode
-  mode: EditorMode;
-
-  // Theme
-  editorTheme: 'white' | 'g10' | 'g90' | 'g100';
-
-  // Undo/Redo (snapshot-based)
   undoStack: ScreenModel[];
   redoStack: ScreenModel[];
-
-  // Clipboard
-  clipboard: Widget[];
-
-  // Palette drag (mouse-event based, replaces HTML5 DnD for Tauri compat)
-  paletteDrag: { type: WidgetType } | null;
-
-  // Undo coalescing (in-memory only): merges rapid same-target edits
-  // (e.g. typing in a property field) into a single undo entry.
+  // Undo coalescing (in-memory only): merges rapid same-target edits into
+  // one entry, per-tab so typing in tab A doesn't reset tab B's coalesce key.
   _lastUndoKey: string | null;
   _lastUndoTime: number;
 }
 
+function createTab(screen: ScreenModel, filePath: string | null = null): TabState {
+  return {
+    id: nanoid(8),
+    screen,
+    filePath,
+    isDirty: false,
+    lastImportReport: null,
+    importError: null,
+    saveError: null,
+    selection: { selectedIds: [], hoveredId: null },
+    viewport: { zoom: 1, panX: 0, panY: 0 },
+    undoStack: [],
+    redoStack: [],
+    _lastUndoKey: null,
+    _lastUndoTime: 0,
+  };
+}
+
+// ── Full Store ──────────────────────────────────────────────────────────────
+
+interface EditorState {
+  // Open tabs (documents) + ordering + active tab. Invariant: `tabOrder`
+  // always has at least one entry, and `activeTabId` always points at one
+  // of them — closing the last tab spawns a fresh untitled one.
+  tabs: Record<string, TabState>;
+  tabOrder: string[];
+  activeTabId: string;
+
+  // Bumped whenever a new screen is loaded into a tab (import/open/newTab
+  // spawned by closing the last tab); the canvas watches this to auto-fit
+  // zoom. Not bumped on tab switch — the tab's stored viewport is preserved.
+  // `fitNonce` is bumped by the toolbar's Fit-to-Screen button (on-demand).
+  screenLoadId: number;
+  fitNonce: number;
+
+  // Panels (shared across tabs)
+  panels: PanelState;
+
+  // Mode (shared)
+  mode: EditorMode;
+
+  // Theme (shared)
+  editorTheme: 'white' | 'g10' | 'g90' | 'g100';
+
+  // Clipboard (shared — paste crosses tabs)
+  clipboard: Widget[];
+
+  // Palette drag (shared)
+  paletteDrag: { type: WidgetType } | null;
+}
+
 interface EditorActions {
-  // Screen
+  // Tab management
+  newTab(): string;
+  closeTab(id: string): void;
+  activateTab(id: string): void;
+
+  // Screen (operates on active tab)
   setScreen(screen: ScreenModel): void;
   setFilePath(path: string | null): void;
   updateScreenMeta(meta: Partial<ScreenMeta>): void;
   markClean(): void;
 
-  // Widget CRUD
+  // Widget CRUD (active tab)
   addWidget(type: WidgetType, layout: AbsoluteLayout, props?: Partial<WidgetProps>): string;
   removeWidgets(ids: string[]): void;
   updateWidget(id: string, updates: Partial<Widget>): void;
@@ -339,7 +373,7 @@ interface EditorActions {
   // Theme
   setEditorTheme(theme: 'white' | 'g10' | 'g90' | 'g100'): void;
 
-  // Undo/Redo
+  // Undo/Redo (per-tab)
   pushUndo(coalesceKey?: string): void;
   undo(): void;
   redo(): void;
@@ -367,6 +401,11 @@ interface EditorActions {
 
 export type EditorStore = EditorState & EditorActions;
 
+/** Returns the active tab. The store's invariant guarantees this is defined. */
+export function getActiveTab(s: EditorStore): TabState {
+  return s.tabs[s.activeTabId];
+}
+
 const UNDO_CAP = 50;
 
 const DEFAULT_PANELS: PanelState = {
@@ -378,69 +417,119 @@ const DEFAULT_PANELS: PanelState = {
   livePreviewMode: 'side-by-side',
 };
 
+// Build the initial store state with one default tab so `activeTabId` is
+// always valid.
+const initialTab = createTab(createDefaultScreen());
+
 export const useEditorStore = create<EditorStore>()(
   immer((set, get) => ({
-    // ── Initial State ────────────��─────────────────────────────────────────
+    // ── Initial State ──────────────────────────────────────────────────────
 
-    screen: createDefaultScreen(),
-    filePath: null,
-    isDirty: false,
-    lastImportReport: null,
-    importError: null,
-    saveError: null,
-    selection: { selectedIds: [], hoveredId: null },
-    viewport: { zoom: 1, panX: 0, panY: 0 },
+    tabs: { [initialTab.id]: initialTab },
+    tabOrder: [initialTab.id],
+    activeTabId: initialTab.id,
     screenLoadId: 0,
     fitNonce: 0,
     panels: DEFAULT_PANELS,
     mode: 'edit',
     editorTheme: 'g90',
-    undoStack: [],
-    redoStack: [],
     clipboard: [],
     paletteDrag: null,
-    _lastUndoKey: null,
-    _lastUndoTime: 0,
 
-    // ── Screen ─────────────────────────────────────────────────────────────
+    // ── Tab management ─────────────────────────────────────────────────────
+
+    newTab() {
+      const tab = createTab(createDefaultScreen());
+      set((s) => {
+        s.tabs[tab.id] = tab;
+        s.tabOrder.push(tab.id);
+        s.activeTabId = tab.id;
+        s.screenLoadId += 1;
+      });
+      return tab.id;
+    },
+
+    closeTab(id) {
+      set((s) => {
+        if (!s.tabs[id]) return;
+        const idx = s.tabOrder.indexOf(id);
+        delete s.tabs[id];
+        s.tabOrder = s.tabOrder.filter((tid) => tid !== id);
+
+        if (s.tabOrder.length === 0) {
+          // Never leave the store tabless — spawn a fresh untitled tab and fit.
+          const fresh = createTab(createDefaultScreen());
+          s.tabs[fresh.id] = fresh;
+          s.tabOrder.push(fresh.id);
+          s.activeTabId = fresh.id;
+          s.screenLoadId += 1;
+          return;
+        }
+
+        if (s.activeTabId === id) {
+          // Activate the neighbor at the same index (or the last if we closed
+          // the rightmost). No screenLoadId bump — the neighbor keeps its
+          // viewport as-is.
+          s.activeTabId = s.tabOrder[Math.min(idx, s.tabOrder.length - 1)];
+        }
+      });
+    },
+
+    activateTab(id) {
+      set((s) => {
+        if (s.tabs[id]) s.activeTabId = id;
+      });
+    },
+
+    // ── Screen (active tab) ────────────────────────────────────────────────
 
     setScreen(screen) {
+      // Replace the active tab's screen wholesale (used by tests and any
+      // future "reload" flow). Resets undo/redo and marks clean, matching the
+      // semantics of loading a fresh document into the tab.
       set((s) => {
-        s.screen = screen;
-        s.isDirty = false;
-        s.selection.selectedIds = [];
-        s.undoStack = [];
-        s.redoStack = [];
-        s.screenLoadId += 1;
+        const t = s.tabs[s.activeTabId];
+        if (!t) return;
+        t.screen = screen;
+        t.isDirty = false;
+        t.selection.selectedIds = [];
+        t.undoStack = [];
+        t.redoStack = [];
       });
     },
 
     setFilePath(path) {
       set((s) => {
-        s.filePath = path;
+        const t = s.tabs[s.activeTabId];
+        if (t) t.filePath = path;
       });
     },
 
     updateScreenMeta(meta) {
       set((s) => {
-        Object.assign(s.screen.meta, meta);
-        s.isDirty = true;
+        const t = s.tabs[s.activeTabId];
+        if (!t) return;
+        Object.assign(t.screen.meta, meta);
+        t.isDirty = true;
       });
     },
 
     markClean() {
       set((s) => {
-        s.isDirty = false;
+        const t = s.tabs[s.activeTabId];
+        if (t) t.isDirty = false;
       });
     },
 
-    // ── Widget CRUD ──────────────────���─────────────────────────────────────
+    // ── Widget CRUD ────────────────────────────────────────────────────────
 
     addWidget(type, layout, props = {}) {
       get().pushUndo();
       const id = nanoid(8);
       set((s) => {
-        const maxZ = Object.values(s.screen.widgets).reduce((max, w) => Math.max(max, w.zIndex), 0);
+        const t = s.tabs[s.activeTabId];
+        if (!t) return;
+        const maxZ = Object.values(t.screen.widgets).reduce((max, w) => Math.max(max, w.zIndex), 0);
         const widget: Widget = {
           id,
           type,
@@ -453,9 +542,9 @@ export const useEditorStore = create<EditorStore>()(
           props: { ...props },
           zIndex: maxZ + 1,
         };
-        s.screen.widgets[id] = widget;
-        s.screen.rootWidgetIds.push(id);
-        s.isDirty = true;
+        t.screen.widgets[id] = widget;
+        t.screen.rootWidgetIds.push(id);
+        t.isDirty = true;
       });
       return id;
     },
@@ -463,41 +552,42 @@ export const useEditorStore = create<EditorStore>()(
     removeWidgets(ids) {
       get().pushUndo();
       set((s) => {
+        const t = s.tabs[s.activeTabId];
+        if (!t) return;
         for (const id of ids) {
-          // Remove from parent's children
-          const widget = s.screen.widgets[id];
+          const widget = t.screen.widgets[id];
           if (widget?.parentId) {
-            const parent = s.screen.widgets[widget.parentId];
+            const parent = t.screen.widgets[widget.parentId];
             if (parent?.children) {
               parent.children = parent.children.filter((cid) => cid !== id);
             }
           }
-          // Remove from root IDs
-          s.screen.rootWidgetIds = s.screen.rootWidgetIds.filter((rid) => rid !== id);
-          // Remove children recursively
+          t.screen.rootWidgetIds = t.screen.rootWidgetIds.filter((rid) => rid !== id);
           const removeChildren = (wid: string) => {
-            const w = s.screen.widgets[wid];
+            const w = t.screen.widgets[wid];
             if (w?.children) {
               for (const cid of w.children) {
                 removeChildren(cid);
               }
             }
-            delete s.screen.widgets[wid];
+            delete t.screen.widgets[wid];
           };
           removeChildren(id);
         }
-        s.selection.selectedIds = s.selection.selectedIds.filter((sid) => !ids.includes(sid));
-        s.isDirty = true;
+        t.selection.selectedIds = t.selection.selectedIds.filter((sid) => !ids.includes(sid));
+        t.isDirty = true;
       });
     },
 
     updateWidget(id, updates) {
       get().pushUndo(`widget:${id}:${Object.keys(updates).sort().join(',')}`);
       set((s) => {
-        const widget = s.screen.widgets[id];
+        const t = s.tabs[s.activeTabId];
+        if (!t) return;
+        const widget = t.screen.widgets[id];
         if (widget) {
           Object.assign(widget, updates);
-          s.isDirty = true;
+          t.isDirty = true;
         }
       });
     },
@@ -505,10 +595,12 @@ export const useEditorStore = create<EditorStore>()(
     updateWidgetProps(id, props) {
       get().pushUndo(`props:${id}:${Object.keys(props).sort().join(',')}`);
       set((s) => {
-        const widget = s.screen.widgets[id];
+        const t = s.tabs[s.activeTabId];
+        if (!t) return;
+        const widget = t.screen.widgets[id];
         if (widget) {
           Object.assign(widget.props, props);
-          s.isDirty = true;
+          t.isDirty = true;
         }
       });
     },
@@ -516,16 +608,20 @@ export const useEditorStore = create<EditorStore>()(
     updateWidgetLayout(id, layout) {
       get().pushUndo(`layout:${id}:${Object.keys(layout).sort().join(',')}`);
       set((s) => {
-        const widget = s.screen.widgets[id];
+        const t = s.tabs[s.activeTabId];
+        if (!t) return;
+        const widget = t.screen.widgets[id];
         if (widget) {
           Object.assign(widget.layout, layout);
-          s.isDirty = true;
+          t.isDirty = true;
         }
       });
     },
 
     moveWidgets(ids, dx, dy) {
       set((s) => {
+        const t = s.tabs[s.activeTabId];
+        if (!t) return;
         // Geometry is stored absolute, so moving a container must explicitly
         // carry its whole subtree (descendants hold their own absolute coords).
         // Collect each selected widget plus all descendants, deduped — a widget
@@ -533,7 +629,7 @@ export const useEditorStore = create<EditorStore>()(
         const toMove = new Map<string, Widget>();
         const collect = (id: string) => {
           if (toMove.has(id)) return;
-          const w = s.screen.widgets[id];
+          const w = t.screen.widgets[id];
           if (!w) return;
           toMove.set(id, w);
           for (const cid of w.children ?? []) collect(cid);
@@ -543,8 +639,8 @@ export const useEditorStore = create<EditorStore>()(
         // Snap-to-grid is applied only to the dragged (top-level selected)
         // widgets; descendants shift by the same raw delta to preserve their
         // offset within the container.
-        const snap = s.screen.meta.snapToGrid;
-        const g = s.screen.meta.gridSize;
+        const snap = t.screen.meta.snapToGrid;
+        const g = t.screen.meta.gridSize;
         const selected = new Set(ids);
         for (const [id, w] of toMove) {
           w.layout.x += dx;
@@ -554,71 +650,78 @@ export const useEditorStore = create<EditorStore>()(
             w.layout.y = Math.round(w.layout.y / g) * g;
           }
         }
-        s.isDirty = true;
+        t.isDirty = true;
       });
     },
 
     resizeWidget(id, layout) {
       // Note: pushUndo should be called once at drag-start, not per-pixel
       set((s) => {
-        const w = s.screen.widgets[id];
+        const t = s.tabs[s.activeTabId];
+        if (!t) return;
+        const w = t.screen.widgets[id];
         if (w) {
           w.layout = { ...layout };
-          if (s.screen.meta.snapToGrid) {
-            const g = s.screen.meta.gridSize;
+          if (t.screen.meta.snapToGrid) {
+            const g = t.screen.meta.gridSize;
             w.layout.x = Math.round(w.layout.x / g) * g;
             w.layout.y = Math.round(w.layout.y / g) * g;
             w.layout.width = Math.max(g, Math.round(w.layout.width / g) * g);
             w.layout.height = Math.max(g, Math.round(w.layout.height / g) * g);
           }
-          s.isDirty = true;
+          t.isDirty = true;
         }
       });
     },
 
-    // ── Z-ordering ───────────────���───────────────────���─────────────────────
+    // ── Z-ordering ─────────────────────────────────────────────────────────
 
     bringToFront(ids) {
       get().pushUndo();
       set((s) => {
-        const maxZ = Object.values(s.screen.widgets).reduce((max, w) => Math.max(max, w.zIndex), 0);
+        const t = s.tabs[s.activeTabId];
+        if (!t) return;
+        const maxZ = Object.values(t.screen.widgets).reduce((max, w) => Math.max(max, w.zIndex), 0);
         ids.forEach((id, i) => {
-          const w = s.screen.widgets[id];
+          const w = t.screen.widgets[id];
           if (w) w.zIndex = maxZ + 1 + i;
         });
-        s.isDirty = true;
+        t.isDirty = true;
       });
     },
 
     sendToBack(ids) {
       get().pushUndo();
       set((s) => {
-        const minZ = Object.values(s.screen.widgets).reduce(
+        const t = s.tabs[s.activeTabId];
+        if (!t) return;
+        const minZ = Object.values(t.screen.widgets).reduce(
           (min, w) => Math.min(min, w.zIndex),
           Infinity
         );
         ids.forEach((id, i) => {
-          const w = s.screen.widgets[id];
+          const w = t.screen.widgets[id];
           if (w) w.zIndex = minZ - ids.length + i;
         });
-        s.isDirty = true;
+        t.isDirty = true;
       });
     },
 
-    // ── Grouping ───────────────────���────────────────────────────────────��──
+    // ── Grouping ───────────────────────────────────────────────────────────
 
     groupWidgets(ids) {
       get().pushUndo();
       const groupId = nanoid(8);
       set((s) => {
-        const maxZ = Object.values(s.screen.widgets).reduce((max, w) => Math.max(max, w.zIndex), 0);
-        // Calculate bounding box
+        const t = s.tabs[s.activeTabId];
+        if (!t) return;
+        const maxZ = Object.values(t.screen.widgets).reduce((max, w) => Math.max(max, w.zIndex), 0);
         let minX = Infinity,
           minY = Infinity,
           maxX = -Infinity,
           maxY = -Infinity;
         for (const id of ids) {
-          const w = s.screen.widgets[id];
+          const w = t.screen.widgets[id];
           if (w) {
             minX = Math.min(minX, w.layout.x);
             minY = Math.min(minY, w.layout.y);
@@ -641,13 +744,12 @@ export const useEditorStore = create<EditorStore>()(
           zIndex: maxZ + 1,
         };
 
-        s.screen.widgets[groupId] = group;
-        s.screen.rootWidgetIds = s.screen.rootWidgetIds.filter((rid) => !ids.includes(rid));
-        s.screen.rootWidgetIds.push(groupId);
+        t.screen.widgets[groupId] = group;
+        t.screen.rootWidgetIds = t.screen.rootWidgetIds.filter((rid) => !ids.includes(rid));
+        t.screen.rootWidgetIds.push(groupId);
 
-        // Adjust children positions to be relative to group
         for (const id of ids) {
-          const w = s.screen.widgets[id];
+          const w = t.screen.widgets[id];
           if (w) {
             w.layout.x -= minX;
             w.layout.y -= minY;
@@ -655,8 +757,8 @@ export const useEditorStore = create<EditorStore>()(
           }
         }
 
-        s.selection.selectedIds = [groupId];
-        s.isDirty = true;
+        t.selection.selectedIds = [groupId];
+        t.isDirty = true;
       });
       return groupId;
     },
@@ -664,22 +766,24 @@ export const useEditorStore = create<EditorStore>()(
     ungroupWidget(groupId) {
       get().pushUndo();
       set((s) => {
-        const group = s.screen.widgets[groupId];
+        const t = s.tabs[s.activeTabId];
+        if (!t) return;
+        const group = t.screen.widgets[groupId];
         if (!group || group.type !== 'Group' || !group.children) return;
 
         for (const childId of group.children) {
-          const child = s.screen.widgets[childId];
+          const child = t.screen.widgets[childId];
           if (child) {
             child.layout.x += group.layout.x;
             child.layout.y += group.layout.y;
             child.parentId = undefined;
-            s.screen.rootWidgetIds.push(childId);
+            t.screen.rootWidgetIds.push(childId);
           }
         }
 
-        s.screen.rootWidgetIds = s.screen.rootWidgetIds.filter((rid) => rid !== groupId);
-        delete s.screen.widgets[groupId];
-        s.isDirty = true;
+        t.screen.rootWidgetIds = t.screen.rootWidgetIds.filter((rid) => rid !== groupId);
+        delete t.screen.widgets[groupId];
+        t.isDirty = true;
       });
     },
 
@@ -687,57 +791,63 @@ export const useEditorStore = create<EditorStore>()(
 
     selectWidgets(ids, append = false) {
       set((s) => {
+        const t = s.tabs[s.activeTabId];
+        if (!t) return;
         if (append) {
-          const newIds = new Set([...s.selection.selectedIds, ...ids]);
-          s.selection.selectedIds = [...newIds];
+          const newIds = new Set([...t.selection.selectedIds, ...ids]);
+          t.selection.selectedIds = [...newIds];
         } else {
-          s.selection.selectedIds = [...ids];
+          t.selection.selectedIds = [...ids];
         }
       });
     },
 
     clearSelection() {
       set((s) => {
-        s.selection.selectedIds = [];
+        const t = s.tabs[s.activeTabId];
+        if (t) t.selection.selectedIds = [];
       });
     },
 
     selectAll() {
       set((s) => {
-        s.selection.selectedIds = [...s.screen.rootWidgetIds];
+        const t = s.tabs[s.activeTabId];
+        if (t) t.selection.selectedIds = [...t.screen.rootWidgetIds];
       });
     },
 
     setHovered(id) {
       set((s) => {
-        s.selection.hoveredId = id;
+        const t = s.tabs[s.activeTabId];
+        if (t) t.selection.hoveredId = id;
       });
     },
 
-    // ── Viewport ───────────────────��─────────────────────────────────���─────
+    // ── Viewport ───────────────────────────────────────────────────────────
 
     setZoom(zoom) {
       set((s) => {
-        s.viewport.zoom = Math.max(0.1, Math.min(5, zoom));
+        const t = s.tabs[s.activeTabId];
+        if (t) t.viewport.zoom = Math.max(0.1, Math.min(5, zoom));
       });
     },
 
     setPan(x, y) {
       set((s) => {
-        s.viewport.panX = x;
-        s.viewport.panY = y;
+        const t = s.tabs[s.activeTabId];
+        if (!t) return;
+        t.viewport.panX = x;
+        t.viewport.panY = y;
       });
     },
 
     requestFit() {
-      // The fit math needs the canvas container's pixel size, which lives in
-      // the Canvas component. Bump the nonce; the canvas watches it and fits.
       set((s) => {
         s.fitNonce += 1;
       });
     },
 
-    // ── Panels ────────────────────��────────────────────────────────���───────
+    // ── Panels ─────────────────────────────────────────────────────────────
 
     togglePanel(panel) {
       set((s) => {
@@ -745,7 +855,7 @@ export const useEditorStore = create<EditorStore>()(
       });
     },
 
-    // ── Mode ────────────────────��─────────────────────────────────────���────
+    // ── Mode ───────────────────────────────────────────────────────────────
 
     setMode(mode) {
       set((s) => {
@@ -759,7 +869,7 @@ export const useEditorStore = create<EditorStore>()(
       });
     },
 
-    // ── Undo/Redo (snapshot-based) ────────────────────────────────────────
+    // ── Undo/Redo (per-tab, snapshot-based) ────────────────────────────────
     // We rely on immer to freeze each producer's output. State outside the
     // producer is therefore deep-immutable, so we can stash references on the
     // undo stack rather than deep-cloning the screen on every keystroke.
@@ -767,53 +877,64 @@ export const useEditorStore = create<EditorStore>()(
     pushUndo(coalesceKey) {
       const state = get();
       const now = Date.now();
+      const tab = state.tabs[state.activeTabId];
+      if (!tab) return;
 
       // Coalesce rapid successive edits to the same target into one entry —
       // typing "PV:NAME" should be one undo, not seven.
-      if (coalesceKey && state._lastUndoKey === coalesceKey && now - state._lastUndoTime < 500) {
+      if (coalesceKey && tab._lastUndoKey === coalesceKey && now - tab._lastUndoTime < 500) {
         set((s) => {
-          s._lastUndoTime = now;
+          const t = s.tabs[s.activeTabId];
+          if (t) t._lastUndoTime = now;
         });
         return;
       }
 
-      const prevScreen = state.screen;
+      const prevScreen = tab.screen;
       set((s) => {
-        s.undoStack.push(prevScreen);
-        if (s.undoStack.length > UNDO_CAP) s.undoStack.shift();
-        s.redoStack = [];
-        s._lastUndoKey = coalesceKey ?? null;
-        s._lastUndoTime = now;
+        const t = s.tabs[s.activeTabId];
+        if (!t) return;
+        t.undoStack.push(prevScreen);
+        if (t.undoStack.length > UNDO_CAP) t.undoStack.shift();
+        t.redoStack = [];
+        t._lastUndoKey = coalesceKey ?? null;
+        t._lastUndoTime = now;
       });
     },
 
     undo() {
       const state = get();
-      if (state.undoStack.length === 0) return;
-      const currentScreen = state.screen;
+      const tab = state.tabs[state.activeTabId];
+      if (!tab || tab.undoStack.length === 0) return;
+      const currentScreen = tab.screen;
       set((s) => {
-        s.redoStack.push(currentScreen);
-        s.screen = s.undoStack.pop()!;
-        s.selection.selectedIds = [];
-        s.isDirty = true;
-        s._lastUndoKey = null;
+        const t = s.tabs[s.activeTabId];
+        if (!t) return;
+        t.redoStack.push(currentScreen);
+        t.screen = t.undoStack.pop()!;
+        t.selection.selectedIds = [];
+        t.isDirty = true;
+        t._lastUndoKey = null;
       });
     },
 
     redo() {
       const state = get();
-      if (state.redoStack.length === 0) return;
-      const currentScreen = state.screen;
+      const tab = state.tabs[state.activeTabId];
+      if (!tab || tab.redoStack.length === 0) return;
+      const currentScreen = tab.screen;
       set((s) => {
-        s.undoStack.push(currentScreen);
-        s.screen = s.redoStack.pop()!;
-        s.selection.selectedIds = [];
-        s.isDirty = true;
-        s._lastUndoKey = null;
+        const t = s.tabs[s.activeTabId];
+        if (!t) return;
+        t.undoStack.push(currentScreen);
+        t.screen = t.redoStack.pop()!;
+        t.selection.selectedIds = [];
+        t.isDirty = true;
+        t._lastUndoKey = null;
       });
     },
 
-    // ── File I/O ──────────────────────────────────────────────────────────
+    // ── File I/O ───────────────────────────────────────────────────────────
 
     async saveToFile() {
       // Save writes the canonical IR document (.screen.json). filePath can
@@ -821,19 +942,32 @@ export const useEditorStore = create<EditorStore>()(
       // any known screen suffix and re-suffix with .screen.json rather than
       // ever writing IR bytes under a .tsx name.
       const state = get();
-      const base = suggestedBase(state.filePath, state.screen.meta.title);
-      await saveScreenAs(`${base}.screen.json`, state, set);
+      const tab = state.tabs[state.activeTabId];
+      if (!tab) return;
+      const base = suggestedBase(tab.filePath, tab.screen.meta.title);
+      await saveActiveTabAs(`${base}.screen.json`, state, set);
     },
 
     async saveAsFile() {
       const state = get();
-      const base = sanitizeTitle(state.screen.meta.title) || 'screen';
-      await saveScreenAs(`${base}.screen.json`, state, set, { freshId: true });
+      const tab = state.tabs[state.activeTabId];
+      if (!tab) return;
+      const base = sanitizeTitle(tab.screen.meta.title) || 'screen';
+      await saveActiveTabAs(`${base}.screen.json`, state, set, { freshId: true });
     },
 
     async openFile() {
       const result = await readScreenFile();
       if (!result) return;
+
+      // Dedupe: if a tab already holds this filePath, activate it instead of
+      // opening a second copy. Matching is on `filePath` (the file name), which
+      // is what save/load already round-trips through.
+      const existing = Object.values(get().tabs).find((t) => t.filePath === result.name);
+      if (existing) {
+        get().activateTab(existing.id);
+        return;
+      }
 
       // Route .screen.json IR documents through the importer; TSX through parseTSX.
       if (isScreenJSON(result.name, result.code)) {
@@ -841,38 +975,35 @@ export const useEditorStore = create<EditorStore>()(
         try {
           imported = importScreenJSON(JSON.parse(result.code));
         } catch (err) {
-          // Surface validation errors; do NOT replace the current screen.
+          // Surface validation errors on the active tab; do NOT open a new tab.
           set((s) => {
-            s.importError =
+            const t = s.tabs[s.activeTabId];
+            if (!t) return;
+            t.importError =
               err instanceof ImportValidationError
                 ? err.errors
                 : [err instanceof Error ? err.message : String(err)];
-            s.lastImportReport = null;
+            t.lastImportReport = null;
           });
           return;
         }
+        const tab = createTab(imported.screen, result.name);
+        tab.lastImportReport = imported.report;
         set((s) => {
-          s.screen = imported.screen;
-          s.filePath = result.name;
-          s.isDirty = false;
-          s.selection.selectedIds = [];
-          s.undoStack = [];
-          s.redoStack = [];
-          s.lastImportReport = imported.report;
-          s.importError = null;
+          s.tabs[tab.id] = tab;
+          s.tabOrder.push(tab.id);
+          s.activeTabId = tab.id;
           s.screenLoadId += 1;
         });
         return;
       }
 
       const screen = parseTSX(result.code);
+      const tab = createTab(screen, result.name);
       set((s) => {
-        s.screen = screen;
-        s.filePath = result.name;
-        s.isDirty = false;
-        s.selection.selectedIds = [];
-        s.undoStack = [];
-        s.redoStack = [];
+        s.tabs[tab.id] = tab;
+        s.tabOrder.push(tab.id);
+        s.activeTabId = tab.id;
         s.screenLoadId += 1;
       });
     },
@@ -901,40 +1032,43 @@ export const useEditorStore = create<EditorStore>()(
         }
       } catch (err) {
         set((s) => {
-          s.importError =
+          const t = s.tabs[s.activeTabId];
+          if (!t) return;
+          t.importError =
             err instanceof ImportValidationError
               ? err.errors
               : err instanceof ConverterError
                 ? [`${err.code}: ${err.message}`]
                 : [err instanceof Error ? err.message : String(err)];
-          s.lastImportReport = null;
+          t.lastImportReport = null;
         });
         return;
       }
 
+      const tab = createTab(imported.screen, file.name.replace(/\.(edl|ui)$/i, '.screen.json'));
+      tab.isDirty = true; // converted but unsaved
+      tab.lastImportReport = imported.report;
       set((s) => {
-        s.screen = imported.screen;
-        s.filePath = file.name.replace(/\.(edl|ui)$/i, '.screen.json');
-        s.isDirty = true; // converted but unsaved
-        s.selection.selectedIds = [];
-        s.undoStack = [];
-        s.redoStack = [];
-        s.lastImportReport = imported.report;
-        s.importError = null;
+        s.tabs[tab.id] = tab;
+        s.tabOrder.push(tab.id);
+        s.activeTabId = tab.id;
         s.screenLoadId += 1;
       });
     },
 
     clearImportReport() {
       set((s) => {
-        s.lastImportReport = null;
-        s.importError = null;
-        s.saveError = null;
+        const t = s.tabs[s.activeTabId];
+        if (!t) return;
+        t.lastImportReport = null;
+        t.importError = null;
+        t.saveError = null;
       });
     },
 
     exportTSX() {
-      return generateTSX(get().screen);
+      const tab = get().tabs[get().activeTabId];
+      return tab ? generateTSX(tab.screen) : '';
     },
 
     async exportCodeFile() {
@@ -942,22 +1076,24 @@ export const useEditorStore = create<EditorStore>()(
       // neither clears isDirty nor retargets filePath — the canonical file
       // stays the .screen.json.
       const state = get();
-      const base = suggestedBase(state.filePath, state.screen.meta.title);
+      const tab = state.tabs[state.activeTabId];
+      if (!tab) return;
+      const base = suggestedBase(tab.filePath, tab.screen.meta.title);
       await writeTextFile(
-        generateTSX(state.screen),
+        generateTSX(tab.screen),
         `${base}.tsx`,
         TSX_FILE_TYPES,
         'text/typescript'
       );
     },
 
-    // ── Clipboard ───────────────────────────────────────────────────────��──
+    // ── Clipboard ──────────────────────────────────────────────────────────
 
     copySelection() {
       const state = get();
-      const copied = state.selection.selectedIds
-        .map((id) => state.screen.widgets[id])
-        .filter(Boolean);
+      const tab = state.tabs[state.activeTabId];
+      if (!tab) return;
+      const copied = tab.selection.selectedIds.map((id) => tab.screen.widgets[id]).filter(Boolean);
       set((s) => {
         s.clipboard = JSON.parse(JSON.stringify(copied));
       });
@@ -968,13 +1104,15 @@ export const useEditorStore = create<EditorStore>()(
       const state = get();
       const newIds: string[] = [];
       set((s) => {
+        const t = s.tabs[s.activeTabId];
+        if (!t) return;
         for (const widget of state.clipboard) {
           const newId = nanoid(8);
-          const maxZ = Object.values(s.screen.widgets).reduce(
+          const maxZ = Object.values(t.screen.widgets).reduce(
             (max, w) => Math.max(max, w.zIndex),
             0
           );
-          s.screen.widgets[newId] = {
+          t.screen.widgets[newId] = {
             ...JSON.parse(JSON.stringify(widget)),
             id: newId,
             name: `${widget.type}_${newId}`,
@@ -986,11 +1124,11 @@ export const useEditorStore = create<EditorStore>()(
             zIndex: maxZ + 1,
             parentId: undefined,
           };
-          s.screen.rootWidgetIds.push(newId);
+          t.screen.rootWidgetIds.push(newId);
           newIds.push(newId);
         }
-        s.selection.selectedIds = newIds;
-        s.isDirty = true;
+        t.selection.selectedIds = newIds;
+        t.isDirty = true;
       });
     },
 
@@ -1000,7 +1138,8 @@ export const useEditorStore = create<EditorStore>()(
     },
 
     deleteSelection() {
-      const ids = get().selection.selectedIds;
+      const tab = get().tabs[get().activeTabId];
+      const ids = tab?.selection.selectedIds ?? [];
       if (ids.length > 0) {
         get().removeWidgets(ids);
       }
