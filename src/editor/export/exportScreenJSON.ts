@@ -357,12 +357,14 @@ function buildRootNode(screen: ScreenModel): PropBag {
   const rootProps: PropBag = {
     width: meta.width,
     height: meta.height,
-    backgroundColor: meta.backgroundColor,
     gridSize: meta.gridSize,
     showGrid: meta.showGrid,
     snapToGrid: meta.snapToGrid,
     version: meta.version,
   };
+  // Only emit backgroundColor when the screen pins one; empty/unset means
+  // "follow the theme" and shouldn't round-trip as an explicit value.
+  put(rootProps, 'backgroundColor', meta.backgroundColor);
   put(rootProps, 'theme', meta.theme);
   put(rootProps, 'showHorizontalScrollbar', meta.showHorizontalScrollbar);
   put(rootProps, 'showVerticalScrollbar', meta.showVerticalScrollbar);

@@ -42,6 +42,9 @@
 
 .canvas-screen {
   position: relative;
+  // Theme-adaptive default; the inline style set from screen.meta.backgroundColor
+  // overrides this when the screen pins its own background.
+  background-color: var(--cds-background);
   box-shadow:
     0 0 0 1px var(--cds-border-strong),
     0 4px 16px rgba(0, 0, 0, 0.4);
@@ -79,4 +82,11 @@
     height: 12px;
     cursor: se-resize;
   }
+}
+
+// Grid dot color rides on --cds-text-secondary so it stays visible against
+// both light and dark canvas backgrounds. Low opacity keeps it a subtle grid.
+.canvas-grid__dot {
+  fill: var(--cds-text-secondary);
+  opacity: 0.35;
 }

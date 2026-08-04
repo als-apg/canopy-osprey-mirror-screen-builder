@@ -13,6 +13,7 @@ export function Canvas() {
   const viewport = useEditorStore((s) => s.viewport);
   const selection = useEditorStore((s) => s.selection);
   const mode = useEditorStore((s) => s.mode);
+  const editorTheme = useEditorStore((s) => s.editorTheme);
   const setZoom = useEditorStore((s) => s.setZoom);
   const setPan = useEditorStore((s) => s.setPan);
   const screenLoadId = useEditorStore((s) => s.screenLoadId);
@@ -465,14 +466,19 @@ export function Canvas() {
           transformOrigin: '0 0',
         }}
       >
-        {/* Screen background — pinned to screen's own theme, not editor theme */}
-        <Theme theme={screen.meta.theme ?? 'g90'}>
+        {/* Follows the app theme by default; `screen.meta.theme` pins the
+            canvas to a specific Carbon theme when the screen (typically an
+            imported doc) explicitly opts in. */}
+        <Theme theme={screen.meta.theme ?? editorTheme}>
           <div
             className="canvas-screen"
             style={{
               width: screen.meta.width,
               height: screen.meta.height,
-              backgroundColor: screen.meta.backgroundColor,
+              // Empty/undefined => let CSS use --cds-background from the Theme.
+              ...(screen.meta.backgroundColor
+                ? { backgroundColor: screen.meta.backgroundColor }
+                : null),
             }}
           >
             {/* Grid */}
@@ -486,10 +492,10 @@ export function Canvas() {
                     patternUnits="userSpaceOnUse"
                   >
                     <circle
+                      className="canvas-grid__dot"
                       cx={gridSize / 2}
                       cy={gridSize / 2}
                       r={0.8}
-                      fill="rgba(255,255,255,0.15)"
                     />
                   </pattern>
                 </defs>
