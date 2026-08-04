@@ -21,6 +21,7 @@ export function Canvas() {
   const clearSelection = useEditorStore((s) => s.clearSelection);
   const moveWidgets = useEditorStore((s) => s.moveWidgets);
   const resizeWidget = useEditorStore((s) => s.resizeWidget);
+  const updateScreenMeta = useEditorStore((s) => s.updateScreenMeta);
   const pushUndo = useEditorStore((s) => s.pushUndo);
   const setHovered = useEditorStore((s) => s.setHovered);
   const addWidget = useEditorStore((s) => s.addWidget);
@@ -37,6 +38,11 @@ export function Canvas() {
     handle: 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w';
     startMouse: { x: number; y: number };
     startLayout: { x: number; y: number; width: number; height: number };
+  } | null>(null);
+  const [screenResize, setScreenResize] = useState<{
+    handle: 'se' | 's' | 'e';
+    startMouse: { x: number; y: number };
+    startSize: { width: number; height: number };
   } | null>(null);
   const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(
     null
@@ -125,6 +131,34 @@ export function Canvas() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitNonce]);
 
+  // ── Screen resize (window-level so the drag survives past the container edge)
+
+  useEffect(() => {
+    if (!screenResize) return;
+    const onMove = (e: MouseEvent) => {
+      if (e.buttons !== 1) return;
+      const pos = screenToCanvas(e.clientX, e.clientY);
+      const dx = pos.x - screenResize.startMouse.x;
+      const dy = pos.y - screenResize.startMouse.y;
+      const MIN = 100;
+      let { width, height } = screenResize.startSize;
+      if (screenResize.handle.includes('e')) {
+        width = Math.max(MIN, screenResize.startSize.width + dx);
+      }
+      if (screenResize.handle.includes('s')) {
+        height = Math.max(MIN, screenResize.startSize.height + dy);
+      }
+      updateScreenMeta({ width: Math.round(width), height: Math.round(height) });
+    };
+    const onUp = () => setScreenResize(null);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [screenResize, screenToCanvas, updateScreenMeta]);
+
   // ── Mouse handling ──────────────────────────────────────────────────────
 
   const handleMouseDown = useCallback(
@@ -141,6 +175,23 @@ export function Canvas() {
       }
 
       if (e.button === 0) {
+        // Screen-resize handle takes priority over everything
+        const screenHandleEl = (e.target as HTMLElement).closest('[data-screen-resize-handle]');
+        if (screenHandleEl) {
+          const handle = screenHandleEl.getAttribute('data-screen-resize-handle') as
+            | 'se'
+            | 's'
+            | 'e';
+          pushUndo();
+          setScreenResize({
+            handle,
+            startMouse: screenToCanvas(e.clientX, e.clientY),
+            startSize: { width: screen.meta.width, height: screen.meta.height },
+          });
+          e.stopPropagation();
+          return;
+        }
+
         // Resize handle takes priority over move
         const handleEl = (e.target as HTMLElement).closest('[data-resize-handle]');
         if (handleEl) {
@@ -201,6 +252,8 @@ export function Canvas() {
       paletteDrag,
       pushUndo,
       screen.widgets,
+      screen.meta.width,
+      screen.meta.height,
     ]
   );
 
@@ -326,6 +379,7 @@ export function Canvas() {
       }
       setIsDragging(false);
       setResize(null);
+      setScreenResize(null);
       setMarquee(null);
     },
     [paletteDrag, marquee, screen.widgets, selectWidgets, screenToCanvas, addWidget, endPaletteDrag]
@@ -448,6 +502,24 @@ export function Canvas() {
 
             {/* Marquee */}
             {marquee && <SelectionMarquee rect={marquee} />}
+
+            {/* Screen resize handles */}
+            {mode === 'edit' && (
+              <>
+                <div
+                  className="canvas-screen__handle canvas-screen__handle--e"
+                  data-screen-resize-handle="e"
+                />
+                <div
+                  className="canvas-screen__handle canvas-screen__handle--s"
+                  data-screen-resize-handle="s"
+                />
+                <div
+                  className="canvas-screen__handle canvas-screen__handle--se"
+                  data-screen-resize-handle="se"
+                />
+              </>
+            )}
           </div>
         </Theme>
       </div>
