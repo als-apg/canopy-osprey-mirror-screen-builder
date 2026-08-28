@@ -18,7 +18,13 @@
   flex: 1;
   min-width: 0;
   overflow-x: auto;
-  scrollbar-width: thin;
+  // Hide the horizontal scrollbar so it doesn't sit on top of the active
+  // tab's 2px inset underline. Horizontal wheel/trackpad scroll still works.
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 .tab-bar__tab {
