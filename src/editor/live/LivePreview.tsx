@@ -173,18 +173,21 @@ export function LivePreview() {
             </div>
           )}
 
-          {/* The actual screen */}
+          {/* The actual screen — bg follows the app theme via --cds-background
+              when the screen doesn't pin its own backgroundColor. */}
           <div
             className="live-preview__screen"
             style={{
               width: screen.meta.width,
               height: screen.meta.height,
-              backgroundColor: screen.meta.backgroundColor,
               position: 'relative',
               transform: screenScale < 1 ? `scale(${screenScale})` : undefined,
               transformOrigin: 'top left',
               overflowX: screen.meta.showHorizontalScrollbar === false ? 'hidden' : 'auto',
               overflowY: screen.meta.showVerticalScrollbar === false ? 'hidden' : 'auto',
+              ...(screen.meta.backgroundColor
+                ? { backgroundColor: screen.meta.backgroundColor }
+                : null),
             }}
           >
             {rootWidgets.map((widget) => renderWidget(widget, new Set()))}

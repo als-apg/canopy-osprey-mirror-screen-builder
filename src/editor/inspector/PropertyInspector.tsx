@@ -133,7 +133,10 @@ export function PropertyInspector() {
                 labelText="Background Color"
                 size="sm"
                 type="color"
-                value={screen.meta.backgroundColor}
+                // Color inputs always need a value; when unset we fall back to
+                // black in the swatch, but the canvas keeps using --cds-background
+                // until the user actually picks a color.
+                value={screen.meta.backgroundColor ?? '#000000'}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   updateScreenMeta({ backgroundColor: e.target.value })
                 }

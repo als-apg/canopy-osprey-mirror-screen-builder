@@ -237,7 +237,9 @@ export interface ScreenMeta {
   title: string;
   width: number;
   height: number;
-  backgroundColor: string;
+  /** Empty/unset means "follow the app theme" — Canvas / LivePreview fall
+   *  back to `--cds-background` via CSS. Explicit hex colors pin the bg. */
+  backgroundColor?: string;
   macros: Record<string, string>;
   gridSize: number;
   showGrid: boolean;
@@ -272,17 +274,18 @@ export interface ScreenModel {
 }
 
 export function createDefaultScreenMeta(): ScreenMeta {
+  // theme and backgroundColor are intentionally omitted: new screens follow
+  // the app's Carbon light/dark theme. Setting either here would pin new
+  // screens to a fixed theme and defeat the point.
   return {
     title: 'New Screen',
     width: 800,
     height: 600,
-    backgroundColor: '#262626',
     macros: {},
     gridSize: 10,
     showGrid: true,
     snapToGrid: true,
     version: '1.0.0',
-    theme: 'g90',
     showHorizontalScrollbar: true,
     showVerticalScrollbar: true,
   };
