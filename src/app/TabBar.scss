@@ -1,7 +1,9 @@
 .tab-bar {
-  height: 32px;
+  // 32px tab row + 6px thin scrollbar lane so the scrollbar can never overlap
+  // the active tab's 2px inset underline.
+  height: 38px;
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 8px;
   padding: 0 1rem 0 0;
   font-size: 0.75rem;
@@ -15,15 +17,34 @@
 
 .tab-bar__tabs {
   display: flex;
+  align-items: flex-start; // pin tabs to top; scrollbar sits in the 6px lane below
   flex: 1;
   min-width: 0;
   overflow-x: auto;
-  // Hide the horizontal scrollbar so it doesn't sit on top of the active
-  // tab's 2px inset underline. Horizontal wheel/trackpad scroll still works.
-  scrollbar-width: none;
+
+  // Thin scrollbar, transparent by default so it doesn't add visual noise,
+  // fades in on hover to signal that more tabs are off-screen (VS Code style).
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 0.15s ease;
+
+  &:hover {
+    scrollbar-color: var(--cds-border-strong) transparent;
+  }
 
   &::-webkit-scrollbar {
-    display: none;
+    height: 6px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 3px;
+    transition: background 0.15s ease;
+  }
+  &:hover::-webkit-scrollbar-thumb {
+    background: var(--cds-border-strong);
   }
 }
 
@@ -96,6 +117,7 @@
 }
 
 .tab-bar__file-path {
+  align-self: center; // stay vertically centered against the 38px bar
   font-size: 0.625rem;
   color: var(--cds-text-helper);
   font-family: 'IBM Plex Mono', monospace;
