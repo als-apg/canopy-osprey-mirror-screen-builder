@@ -22,7 +22,14 @@ import {
   Subtract,
 } from '@carbon/icons-react';
 import { useEditorStore } from '../model/EditorStore';
-import { createDefaultScreen } from '../../types/widget';
+import {
+  useScreen,
+  useSelection,
+  useViewport,
+  useIsDirty,
+  useUndoStack,
+  useRedoStack,
+} from '../model/hooks';
 import './Toolbar.scss';
 
 export function Toolbar() {
@@ -31,9 +38,9 @@ export function Toolbar() {
   const exportCodeFile = useEditorStore((s) => s.exportCodeFile);
   const openFile = useEditorStore((s) => s.openFile);
   const importLegacyScreen = useEditorStore((s) => s.importLegacyScreen);
-  const setScreen = useEditorStore((s) => s.setScreen);
-  const undoStack = useEditorStore((s) => s.undoStack);
-  const redoStack = useEditorStore((s) => s.redoStack);
+  const newTab = useEditorStore((s) => s.newTab);
+  const undoStack = useUndoStack();
+  const redoStack = useRedoStack();
   const undo = useEditorStore((s) => s.undo);
   const redo = useEditorStore((s) => s.redo);
   const copySelection = useEditorStore((s) => s.copySelection);
@@ -41,13 +48,13 @@ export function Toolbar() {
   const deleteSelection = useEditorStore((s) => s.deleteSelection);
   const setZoom = useEditorStore((s) => s.setZoom);
   const requestFit = useEditorStore((s) => s.requestFit);
-  const viewport = useEditorStore((s) => s.viewport);
-  const screen = useEditorStore((s) => s.screen);
+  const viewport = useViewport();
+  const screen = useScreen();
   const updateScreenMeta = useEditorStore((s) => s.updateScreenMeta);
-  const selection = useEditorStore((s) => s.selection);
+  const selection = useSelection();
   const groupWidgets = useEditorStore((s) => s.groupWidgets);
   const ungroupWidget = useEditorStore((s) => s.ungroupWidget);
-  const isDirty = useEditorStore((s) => s.isDirty);
+  const isDirty = useIsDirty();
 
   const hasSelection = selection.selectedIds.length > 0;
   const hasMultiSelection = selection.selectedIds.length > 1;
@@ -86,10 +93,7 @@ export function Toolbar() {
           iconDescription="New Screen"
           tooltipPosition="bottom"
           tooltipAlignment="start"
-          onClick={() => {
-            if (isDirty && !confirm('Discard unsaved changes?')) return;
-            setScreen(createDefaultScreen());
-          }}
+          onClick={newTab}
         />
         <Button
           kind="ghost"
@@ -109,10 +113,7 @@ export function Toolbar() {
           iconDescription="Import legacy screen (.edl/.ui)"
           tooltipPosition="bottom"
           tooltipAlignment="start"
-          onClick={() => {
-            if (isDirty && !confirm('Discard unsaved changes?')) return;
-            void importLegacyScreen();
-          }}
+          onClick={() => void importLegacyScreen()}
         />
         <Button
           kind="ghost"

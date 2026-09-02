@@ -110,35 +110,6 @@
   flex-shrink: 0;
 }
 
-.shell__title-text {
-  cursor: default;
-  padding: 2px 6px;
-  border-radius: 2px;
-  color: var(--cds-text-primary);
-
-  &:hover {
-    background-color: var(--cds-layer-hover-01);
-  }
-}
-
-.shell__title-input {
-  background: var(--cds-field-01);
-  border: 1px solid var(--pydm-selection);
-  border-radius: 2px;
-  color: var(--cds-text-primary);
-  font-size: 0.75rem;
-  padding: 2px 6px;
-  outline: none;
-  width: 200px;
-}
-
-.shell__file-path {
-  font-size: 0.625rem;
-  color: var(--cds-text-helper);
-  font-family: 'IBM Plex Mono', monospace;
-  opacity: 0.7;
-}
-
 .shell__canvas-area--split {
   flex: 1;
   min-width: 0;

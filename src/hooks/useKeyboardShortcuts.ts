@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { useEditorStore } from '../editor/model/EditorStore';
+import { useEditorStore, getActiveTab } from '../editor/model/EditorStore';
+import { useScreen, useSelection } from '../editor/model/hooks';
 
 export function useKeyboardShortcuts() {
   const nudgeUndoPushed = useRef(false);
@@ -18,8 +19,8 @@ export function useKeyboardShortcuts() {
   const pushUndo = useEditorStore((s) => s.pushUndo);
   const saveToFile = useEditorStore((s) => s.saveToFile);
   const openFile = useEditorStore((s) => s.openFile);
-  const selection = useEditorStore((s) => s.selection);
-  const screen = useEditorStore((s) => s.screen);
+  const selection = useSelection();
+  const screen = useScreen();
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -103,7 +104,8 @@ export function useKeyboardShortcuts() {
       }
       // Arrow key nudge
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-        const currentSelection = useEditorStore.getState().selection.selectedIds;
+        const activeTab = getActiveTab(useEditorStore.getState());
+        const currentSelection = activeTab.selection.selectedIds;
         if (currentSelection.length > 0) {
           e.preventDefault();
           // Only push undo once per nudge burst (debounce 500ms)
@@ -116,9 +118,7 @@ export function useKeyboardShortcuts() {
             nudgeUndoPushed.current = false;
           }, 500);
 
-          const gridSize = useEditorStore.getState().screen.meta.snapToGrid
-            ? useEditorStore.getState().screen.meta.gridSize
-            : 1;
+          const gridSize = activeTab.screen.meta.snapToGrid ? activeTab.screen.meta.gridSize : 1;
           const step = e.shiftKey ? gridSize * 5 : gridSize;
           const dx = e.key === 'ArrowRight' ? step : e.key === 'ArrowLeft' ? -step : 0;
           const dy = e.key === 'ArrowDown' ? step : e.key === 'ArrowUp' ? -step : 0;

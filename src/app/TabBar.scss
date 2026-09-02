@@ -1,0 +1,138 @@
+.tab-bar {
+  // Fixed 32px height — the custom scrollbar overlay (below) is
+  // absolute-positioned so it never contributes to layout, ensuring the bar's
+  // height is identical whether or not tabs overflow.
+  position: relative;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 1rem 0 0;
+  font-size: 0.75rem;
+  color: var(--cds-text-secondary);
+  background-color: var(--cds-layer-01);
+  border-bottom: 1px solid var(--cds-border-subtle);
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.tab-bar__tabs {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+
+  // Hide the native scrollbar entirely — a custom overlay thumb
+  // (`.tab-bar__scrollbar-thumb`) is rendered on top of the strip instead.
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.tab-bar__scrollbar {
+  // Absolute overlay 2px above the bar's bottom edge — sits just above the
+  // active tab's 2px inset underline instead of covering it. No layout
+  // impact — the strip stays 32px whether the thumb is visible or not.
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 2px;
+  height: 3px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+
+  &--visible {
+    opacity: 1;
+  }
+}
+
+.tab-bar__scrollbar-thumb {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--cds-border-strong);
+  border-radius: 2px;
+}
+
+.tab-bar__tab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 8px 0 12px;
+  border-right: 1px solid var(--cds-border-subtle);
+  color: var(--cds-text-secondary);
+  cursor: pointer;
+  min-width: 0;
+  max-width: 200px;
+  flex-shrink: 0;
+
+  &:hover {
+    background-color: var(--cds-layer-hover-01);
+  }
+
+  &--active {
+    color: var(--cds-text-primary);
+    background-color: var(--cds-layer-02);
+    box-shadow: inset 0 -2px 0 var(--pydm-selection);
+  }
+}
+
+.tab-bar__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 2px 4px;
+  border-radius: 2px;
+}
+
+.tab-bar__dirty-dot {
+  color: var(--pydm-selection);
+  font-weight: bold;
+}
+
+.tab-bar__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 2px;
+  background: transparent;
+  color: var(--cds-text-secondary);
+  cursor: pointer;
+  opacity: 0.6;
+
+  &:hover {
+    background-color: var(--cds-layer-hover-02);
+    opacity: 1;
+  }
+}
+
+.tab-bar__rename-input {
+  background: var(--cds-field-01);
+  border: 1px solid var(--pydm-selection);
+  border-radius: 2px;
+  color: var(--cds-text-primary);
+  font-size: 0.75rem;
+  padding: 2px 6px;
+  outline: none;
+  width: 140px;
+}
+
+.tab-bar__file-path {
+  align-self: center; // stay vertically centered against the 38px bar
+  font-size: 0.625rem;
+  color: var(--cds-text-helper);
+  font-family: 'IBM Plex Mono', monospace;
+  opacity: 0.7;
+  flex-shrink: 0;
+  padding-left: 8px;
+  border-left: 1px solid var(--cds-border-subtle);
+}

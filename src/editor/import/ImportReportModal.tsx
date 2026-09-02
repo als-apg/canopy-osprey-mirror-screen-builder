@@ -5,11 +5,12 @@
 
 import { Modal, UnorderedList, ListItem } from '@carbon/react';
 import { useEditorStore } from '../model/EditorStore';
+import { useLastImportReport, useImportError, useSaveError } from '../model/hooks';
 
 export function ImportReportModal() {
-  const report = useEditorStore((s) => s.lastImportReport);
-  const error = useEditorStore((s) => s.importError);
-  const saveError = useEditorStore((s) => s.saveError);
+  const report = useLastImportReport();
+  const error = useImportError();
+  const saveError = useSaveError();
   const clear = useEditorStore((s) => s.clearImportReport);
 
   // Save-error path: the screen failed IR validation on export. No file was

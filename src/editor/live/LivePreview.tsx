@@ -1,6 +1,6 @@
 import { useMemo, useState, useRef } from 'react';
 import { TextInput } from '@carbon/react';
-import { useEditorStore } from '../model/EditorStore';
+import { useScreen } from '../model/hooks';
 import { widgetRegistry } from '../../widgets/registry/WidgetRegistry';
 import {
   CarbonPVTextDisplay,
@@ -35,7 +35,7 @@ const LIVE_COMPONENTS: Partial<Record<WidgetType, React.ComponentType<WidgetRend
 };
 
 export function LivePreview() {
-  const screen = useEditorStore((s) => s.screen);
+  const screen = useScreen();
   const [macroOverrides, setMacroOverrides] = useState<Record<string, string>>({});
   const [activeBreakpoint, setActiveBreakpoint] = useState('auto');
   const [customWidth, setCustomWidth] = useState<number | null>(null);
