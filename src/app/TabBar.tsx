@@ -1,7 +1,12 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Close } from '@carbon/icons-react';
 import { useEditorStore } from '../editor/model/EditorStore';
 import './TabBar.scss';
+
+// Grace period during which the scrollbar stays visible after the last scroll
+// event before fading back out — long enough that trackpad flick-scrolls feel
+// smooth, short enough that the bar doesn't linger.
+const SCROLLBAR_HIDE_DELAY_MS = 800;
 
 /**
  * Horizontal strip of open-document tabs above the canvas. Each tab shows the
@@ -19,6 +24,61 @@ export function TabBar() {
 
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
+
+  // Native scrollbar is hidden entirely; we render a custom absolute-positioned
+  // thumb over the bottom edge of the bar so the tab strip stays exactly 32px
+  // tall (no reserved lane, no layout shift). Position and width are computed
+  // from `.tab-bar__tabs`'s scrollLeft / scrollWidth / clientWidth.
+  const tabsRef = useRef<HTMLDivElement>(null);
+  const [scrollbarVisible, setScrollbarVisible] = useState(false);
+  const [isHovering, setIsHovering] = useState(false);
+  const [thumb, setThumb] = useState({ hasOverflow: false, left: 0, width: 0 });
+  const scrollHideTimer = useRef<number | null>(null);
+
+  const syncThumb = useCallback(() => {
+    const el = tabsRef.current;
+    if (!el) return;
+    const hasOverflow = el.scrollWidth > el.clientWidth + 1; // 1px slack for rounding
+    if (!hasOverflow) {
+      setThumb({ hasOverflow: false, left: 0, width: 0 });
+      return;
+    }
+    const width = Math.max(24, (el.clientWidth / el.scrollWidth) * el.clientWidth);
+    const scrollable = el.scrollWidth - el.clientWidth;
+    const trackSpace = el.clientWidth - width;
+    const left = scrollable > 0 ? (el.scrollLeft / scrollable) * trackSpace : 0;
+    setThumb({ hasOverflow: true, left, width });
+  }, []);
+
+  // Resync on window resize / tab list changes.
+  useEffect(() => {
+    const el = tabsRef.current;
+    if (!el) return;
+    syncThumb();
+    const ro = new ResizeObserver(syncThumb);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [syncThumb, tabOrder]);
+
+  const handleScroll = useCallback(() => {
+    syncThumb();
+    setScrollbarVisible(true);
+    if (scrollHideTimer.current !== null) window.clearTimeout(scrollHideTimer.current);
+    scrollHideTimer.current = window.setTimeout(() => {
+      if (!isHovering) setScrollbarVisible(false);
+      scrollHideTimer.current = null;
+    }, SCROLLBAR_HIDE_DELAY_MS);
+  }, [syncThumb, isHovering]);
+
+  const handleMouseEnter = useCallback(() => {
+    setIsHovering(true);
+    setScrollbarVisible(true);
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    setIsHovering(false);
+    if (scrollHideTimer.current === null) setScrollbarVisible(false);
+  }, []);
 
   const startRename = useCallback((id: string, current: string) => {
     setRenamingId(id);
@@ -55,8 +115,8 @@ export function TabBar() {
   const activeFileName = activeTab?.filePath ? activeTab.filePath.split(/[/\\]/).pop() : null;
 
   return (
-    <div className="tab-bar">
-      <div className="tab-bar__tabs" role="tablist">
+    <div className="tab-bar" onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
+      <div className="tab-bar__tabs" ref={tabsRef} role="tablist" onScroll={handleScroll}>
         {tabOrder.map((id) => {
           const tab = tabs[id];
           if (!tab) return null;
@@ -115,6 +175,17 @@ export function TabBar() {
         })}
       </div>
       {activeFileName && <span className="tab-bar__file-path">{activeFileName}</span>}
+      {thumb.hasOverflow && (
+        <div
+          className={`tab-bar__scrollbar ${scrollbarVisible ? 'tab-bar__scrollbar--visible' : ''}`}
+          aria-hidden
+        >
+          <div
+            className="tab-bar__scrollbar-thumb"
+            style={{ left: thumb.left, width: thumb.width }}
+          />
+        </div>
+      )}
     </div>
   );
 }

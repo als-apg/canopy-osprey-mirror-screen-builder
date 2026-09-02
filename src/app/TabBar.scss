@@ -1,9 +1,11 @@
 .tab-bar {
-  // 32px tab row + 6px thin scrollbar lane so the scrollbar can never overlap
-  // the active tab's 2px inset underline.
-  height: 38px;
+  // Fixed 32px height — the custom scrollbar overlay (below) is
+  // absolute-positioned so it never contributes to layout, ensuring the bar's
+  // height is identical whether or not tabs overflow.
+  position: relative;
+  height: 32px;
   display: flex;
-  align-items: stretch;
+  align-items: center;
   gap: 8px;
   padding: 0 1rem 0 0;
   font-size: 0.75rem;
@@ -12,40 +14,48 @@
   border-bottom: 1px solid var(--cds-border-subtle);
   user-select: none;
   flex-shrink: 0;
-  overflow: hidden;
 }
 
 .tab-bar__tabs {
   display: flex;
-  align-items: flex-start; // pin tabs to top; scrollbar sits in the 6px lane below
   flex: 1;
   min-width: 0;
+  height: 100%;
   overflow-x: auto;
+  overflow-y: hidden;
 
-  // Thin scrollbar, transparent by default so it doesn't add visual noise,
-  // fades in on hover to signal that more tabs are off-screen (VS Code style).
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-  transition: scrollbar-color 0.15s ease;
-
-  &:hover {
-    scrollbar-color: var(--cds-border-strong) transparent;
-  }
-
+  // Hide the native scrollbar entirely — a custom overlay thumb
+  // (`.tab-bar__scrollbar-thumb`) is rendered on top of the strip instead.
+  scrollbar-width: none;
   &::-webkit-scrollbar {
-    height: 6px;
+    display: none;
   }
-  &::-webkit-scrollbar-track {
-    background: transparent;
+}
+
+.tab-bar__scrollbar {
+  // Absolute overlay 2px above the bar's bottom edge — sits just above the
+  // active tab's 2px inset underline instead of covering it. No layout
+  // impact — the strip stays 32px whether the thumb is visible or not.
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 2px;
+  height: 3px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+
+  &--visible {
+    opacity: 1;
   }
-  &::-webkit-scrollbar-thumb {
-    background: transparent;
-    border-radius: 3px;
-    transition: background 0.15s ease;
-  }
-  &:hover::-webkit-scrollbar-thumb {
-    background: var(--cds-border-strong);
-  }
+}
+
+.tab-bar__scrollbar-thumb {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--cds-border-strong);
+  border-radius: 2px;
 }
 
 .tab-bar__tab {
