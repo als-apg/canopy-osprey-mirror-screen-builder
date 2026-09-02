@@ -329,6 +329,7 @@ interface EditorActions {
   newTab(): string;
   closeTab(id: string): void;
   activateTab(id: string): void;
+  reorderTab(fromId: string, toId: string): void;
 
   // Screen (operates on active tab)
   setScreen(screen: ScreenModel): void;
@@ -478,6 +479,17 @@ export const useEditorStore = create<EditorStore>()(
     activateTab(id) {
       set((s) => {
         if (s.tabs[id]) s.activeTabId = id;
+      });
+    },
+
+    reorderTab(fromId, toId) {
+      set((s) => {
+        if (fromId === toId) return;
+        const fromIdx = s.tabOrder.indexOf(fromId);
+        const toIdx = s.tabOrder.indexOf(toId);
+        if (fromIdx < 0 || toIdx < 0) return;
+        s.tabOrder.splice(fromIdx, 1);
+        s.tabOrder.splice(toIdx, 0, fromId);
       });
     },
 
