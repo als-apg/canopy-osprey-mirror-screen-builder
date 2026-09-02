@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { Close } from '@carbon/icons-react';
 import { useEditorStore } from '../editor/model/EditorStore';
+import type { TabState } from '../editor/model/EditorStore';
 import './TabBar.scss';
 
 // Grace period during which the scrollbar stays visible after the last scroll
@@ -8,11 +12,120 @@ import './TabBar.scss';
 // smooth, short enough that the bar doesn't linger.
 const SCROLLBAR_HIDE_DELAY_MS = 800;
 
+// Pointer distance (px) the user must move before a drag activates. Below the
+// threshold clicks still activate the tab (and don't start a spurious drag).
+const DRAG_ACTIVATION_DISTANCE_PX = 5;
+
+interface SortableTabProps {
+  id: string;
+  tab: TabState;
+  isActive: boolean;
+  isRenaming: boolean;
+  draft: string;
+  onDraftChange: (v: string) => void;
+  onActivate: () => void;
+  onStartRename: () => void;
+  onCommitRename: () => void;
+  onCancelRename: () => void;
+  onClose: (e: React.MouseEvent) => void;
+}
+
+function SortableTab({
+  id,
+  tab,
+  isActive,
+  isRenaming,
+  draft,
+  onDraftChange,
+  onActivate,
+  onStartRename,
+  onCommitRename,
+  onCancelRename,
+  onClose,
+}: SortableTabProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+    // Disable drag while renaming so pointerdown on the input doesn't start a
+    // drag — the input needs full pointer control for text selection.
+    disabled: isRenaming,
+  });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    // The dragged tab is lifted visually via opacity + z-index; sortable
+    // handles the sliding-out-of-way animation for the neighbors for free.
+    opacity: isDragging ? 0.4 : undefined,
+    zIndex: isDragging ? 1 : undefined,
+  };
+
+  const title = tab.screen.meta.title;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      role="tab"
+      aria-selected={isActive}
+      className={`tab-bar__tab ${isActive ? 'tab-bar__tab--active' : ''} ${tab.isDirty ? 'tab-bar__tab--dirty' : ''} ${isDragging ? 'tab-bar__tab--dragging' : ''}`}
+      onClick={onActivate}
+      {...attributes}
+      {...listeners}
+    >
+      {isRenaming ? (
+        <input
+          className="tab-bar__rename-input"
+          value={draft}
+          onChange={(e) => onDraftChange(e.target.value)}
+          onBlur={() => setTimeout(onCommitRename, 100)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') onCommitRename();
+            if (e.key === 'Escape') onCancelRename();
+          }}
+          // Stop pointer events from bubbling to the sortable listeners so the
+          // input can be clicked/dragged for text selection.
+          onPointerDown={(e) => e.stopPropagation()}
+          ref={(el) => {
+            if (el) {
+              // Defer focus so the double-click mouseup doesn't steal it
+              requestAnimationFrame(() => {
+                el.focus();
+                el.select();
+              });
+            }
+          }}
+        />
+      ) : (
+        <span
+          className="tab-bar__label"
+          onDoubleClick={() => isActive && onStartRename()}
+          title={isActive ? 'Double-click to rename' : title}
+        >
+          {title}
+          {tab.isDirty && <span className="tab-bar__dirty-dot"> *</span>}
+        </span>
+      )}
+      <button
+        type="button"
+        className="tab-bar__close"
+        onClick={onClose}
+        // Same reason as the rename input — the close button needs its own
+        // pointerdown, not the drag sensor's.
+        onPointerDown={(e) => e.stopPropagation()}
+        aria-label={`Close ${title}`}
+        title="Close"
+      >
+        <Close size={16} />
+      </button>
+    </div>
+  );
+}
+
 /**
  * Horizontal strip of open-document tabs above the canvas. Each tab shows the
  * screen title (with a `*` marker if dirty) plus a close button. Clicking the
  * body activates the tab; double-clicking the active tab's title opens an
- * inline rename input (same UX as the previous single-screen title editor).
+ * inline rename input. Tabs can be dragged horizontally to reorder them.
  */
 export function TabBar() {
   const tabs = useEditorStore((s) => s.tabs);
@@ -20,6 +133,7 @@ export function TabBar() {
   const activeTabId = useEditorStore((s) => s.activeTabId);
   const activateTab = useEditorStore((s) => s.activateTab);
   const closeTab = useEditorStore((s) => s.closeTab);
+  const reorderTab = useEditorStore((s) => s.reorderTab);
   const updateScreenMeta = useEditorStore((s) => s.updateScreenMeta);
 
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -111,69 +225,54 @@ export function TabBar() {
     [tabs, closeTab]
   );
 
+  // Small activation distance keeps quick clicks from starting spurious drags.
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: DRAG_ACTIVATION_DISTANCE_PX },
+    })
+  );
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (over && active.id !== over.id) {
+        reorderTab(String(active.id), String(over.id));
+      }
+    },
+    [reorderTab]
+  );
+
   const activeTab = tabs[activeTabId];
   const activeFileName = activeTab?.filePath ? activeTab.filePath.split(/[/\\]/).pop() : null;
 
   return (
     <div className="tab-bar" onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
-      <div className="tab-bar__tabs" ref={tabsRef} role="tablist" onScroll={handleScroll}>
-        {tabOrder.map((id) => {
-          const tab = tabs[id];
-          if (!tab) return null;
-          const isActive = id === activeTabId;
-          const isRenaming = renamingId === id;
-          const title = tab.screen.meta.title;
-          return (
-            <div
-              key={id}
-              role="tab"
-              aria-selected={isActive}
-              className={`tab-bar__tab ${isActive ? 'tab-bar__tab--active' : ''} ${tab.isDirty ? 'tab-bar__tab--dirty' : ''}`}
-              onClick={() => !isRenaming && activateTab(id)}
-            >
-              {isRenaming ? (
-                <input
-                  className="tab-bar__rename-input"
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  onBlur={() => setTimeout(commitRename, 100)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') commitRename();
-                    if (e.key === 'Escape') setRenamingId(null);
-                  }}
-                  ref={(el) => {
-                    if (el) {
-                      // Defer focus so the double-click mouseup doesn't steal it
-                      requestAnimationFrame(() => {
-                        el.focus();
-                        el.select();
-                      });
-                    }
-                  }}
+      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+        <div className="tab-bar__tabs" ref={tabsRef} role="tablist" onScroll={handleScroll}>
+          <SortableContext items={tabOrder} strategy={horizontalListSortingStrategy}>
+            {tabOrder.map((id) => {
+              const tab = tabs[id];
+              if (!tab) return null;
+              return (
+                <SortableTab
+                  key={id}
+                  id={id}
+                  tab={tab}
+                  isActive={id === activeTabId}
+                  isRenaming={renamingId === id}
+                  draft={draft}
+                  onDraftChange={setDraft}
+                  onActivate={() => renamingId !== id && activateTab(id)}
+                  onStartRename={() => startRename(id, tab.screen.meta.title)}
+                  onCommitRename={commitRename}
+                  onCancelRename={() => setRenamingId(null)}
+                  onClose={(e) => handleClose(e, id)}
                 />
-              ) : (
-                <span
-                  className="tab-bar__label"
-                  onDoubleClick={() => isActive && startRename(id, title)}
-                  title={isActive ? 'Double-click to rename' : title}
-                >
-                  {title}
-                  {tab.isDirty && <span className="tab-bar__dirty-dot"> *</span>}
-                </span>
-              )}
-              <button
-                type="button"
-                className="tab-bar__close"
-                onClick={(e) => handleClose(e, id)}
-                aria-label={`Close ${title}`}
-                title="Close"
-              >
-                <Close size={16} />
-              </button>
-            </div>
-          );
-        })}
-      </div>
+              );
+            })}
+          </SortableContext>
+        </div>
+      </DndContext>
       {activeFileName && <span className="tab-bar__file-path">{activeFileName}</span>}
       {thumb.hasOverflow && (
         <div
