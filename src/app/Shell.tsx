@@ -46,6 +46,23 @@ export function Shell() {
     };
   }, [paletteDrag, endPaletteDrag]);
 
+  // ── beforeunload guard for unsaved tabs ─────────────────────────────────
+  // Tabs live in memory only, so a reload drops everything. When any open tab
+  // is dirty, prompt the browser's native "changes may not be saved" dialog
+  // before the page unloads. Modern browsers ignore any custom message, so
+  // just calling preventDefault + setting returnValue is enough to trigger it.
+  const anyTabDirty = useEditorStore((s) => Object.values(s.tabs).some((t) => t.isDirty));
+
+  useEffect(() => {
+    if (!anyTabDirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [anyTabDirty]);
+
   const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
   const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(false);
 
