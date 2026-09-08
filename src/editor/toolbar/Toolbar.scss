@@ -38,8 +38,9 @@
   user-select: none;
 }
 
-.toolbar__grid-size {
-  width: 42px;
+.toolbar__grid-size,
+.toolbar__screen-size {
+  width: 52px;
   height: 24px;
   background: var(--cds-field-01);
   border: 1px solid var(--cds-border-subtle);
@@ -55,6 +56,19 @@
     outline: 2px solid var(--pydm-selection);
     outline-offset: -2px;
   }
+}
+
+.toolbar__grid-size {
+  width: 42px;
+}
+
+.toolbar__field-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.6875rem;
+  color: var(--cds-text-secondary);
+  user-select: none;
 }
 
 .toolbar__dirty-indicator {

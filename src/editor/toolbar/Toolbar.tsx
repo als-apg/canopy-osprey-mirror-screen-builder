@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { Button } from '@carbon/react';
 import {
   DocumentAdd,
@@ -31,6 +31,60 @@ import {
   useRedoStack,
 } from '../model/hooks';
 import './Toolbar.scss';
+
+const MAX_SCREEN_DIMENSION = 10000;
+
+interface NumericTextInputProps {
+  value: number;
+  onCommit: (value: number) => void;
+  min: number;
+  max: number;
+  className?: string;
+  title?: string;
+}
+
+function NumericTextInput({ value, onCommit, min, max, className, title }: NumericTextInputProps) {
+  const [draft, setDraft] = useState(String(value));
+  const [lastExternalValue, setLastExternalValue] = useState(value);
+
+  if (value !== lastExternalValue) {
+    setLastExternalValue(value);
+    setDraft(String(value));
+  }
+
+  const commit = () => {
+    const parsed = parseInt(draft, 10);
+    if (Number.isNaN(parsed)) {
+      setDraft(String(value));
+      return;
+    }
+    const clamped = Math.min(max, Math.max(min, parsed));
+    if (clamped !== value) onCommit(clamped);
+    setDraft(String(clamped));
+  };
+
+  return (
+    <input
+      type="number"
+      className={className}
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          commit();
+          (e.target as HTMLInputElement).blur();
+        } else if (e.key === 'Escape') {
+          setDraft(String(value));
+          (e.target as HTMLInputElement).blur();
+        }
+      }}
+      min={min}
+      max={max}
+      title={title}
+    />
+  );
+}
 
 export function Toolbar() {
   const saveToFile = useEditorStore((s) => s.saveToFile);
@@ -282,18 +336,41 @@ export function Toolbar() {
           tooltipPosition="bottom"
           onClick={toggleSnapToGrid}
         />
-        <input
-          type="number"
+        <NumericTextInput
           className="toolbar__grid-size"
           value={screen.meta.gridSize}
-          onChange={(e) => {
-            const val = parseInt(e.target.value);
-            if (val >= 1 && val <= 100) updateScreenMeta({ gridSize: val });
-          }}
+          onCommit={(gridSize) => updateScreenMeta({ gridSize })}
           min={1}
           max={100}
           title="Grid Size (px)"
         />
+      </div>
+
+      <div className="toolbar__divider" />
+
+      <div className="toolbar__section">
+        <label className="toolbar__field-label" title="Screen Width (px)">
+          W
+          <NumericTextInput
+            className="toolbar__screen-size"
+            value={screen.meta.width}
+            onCommit={(width) => updateScreenMeta({ width })}
+            min={1}
+            max={MAX_SCREEN_DIMENSION}
+            title="Screen Width (px)"
+          />
+        </label>
+        <label className="toolbar__field-label" title="Screen Height (px)">
+          H
+          <NumericTextInput
+            className="toolbar__screen-size"
+            value={screen.meta.height}
+            onCommit={(height) => updateScreenMeta({ height })}
+            min={1}
+            max={MAX_SCREEN_DIMENSION}
+            title="Screen Height (px)"
+          />
+        </label>
       </div>
 
       <div className="toolbar__spacer" />
