@@ -1,0 +1,91 @@
+# Served by nginx:alpine's built-in envsubst entrypoint
+# (docker-entrypoint.d/20-envsubst-on-templates.sh), which renders every
+# /etc/nginx/templates/*.template into /etc/nginx/conf.d/ at container startup.
+# That directory is included from inside the stock nginx.conf's `http` block, so
+# this file declares only a `server` — no `http {}` wrapper.
+#
+# Substituted vars (see Dockerfile ENV defaults and the Kubernetes Deployment):
+#   BASE_PATH       URL prefix the app is served under, with trailing slash.
+#   CANOPY_UPSTREAM in-cluster Canopy base URL, no trailing slash.
+#   CANOPY_API_KEY  Canopy read key, injected from a Kubernetes secret.
+#   NGINX_LOCAL_RESOLVERS  set by the base image's 15-local-resolvers.envsh
+#                          from /etc/resolv.conf (the cluster DNS in k8s).
+# Only these are listed in ENVSUBST_VARS so nginx's own `$host`, `$remote_addr`,
+# etc. survive substitution.
+
+server {
+    listen 8080;
+    root   /usr/share/nginx/html;
+    index  index.html;
+
+    # Emit relative Location headers. nginx redirects a bare `/screen-builder`
+    # to the directory form, and by default builds an absolute URL from this
+    # server's own name and port — behind the ingress that leaks `:8080` and
+    # downgrades the scheme, sending the browser somewhere unreachable. Relative
+    # redirects let the client keep the original scheme, host, and port.
+    absolute_redirect off;
+
+    # Uploaded .edl/.ui screens pass through this proxy on their way to the
+    # converter. Canopy's own cap is CANOPY_CONVERTER__MAX_UPLOAD_BYTES (10 MiB
+    # default); keep nginx above it so the app surfaces Canopy's structured
+    # CanopyError rather than a bare nginx 413.
+    client_max_body_size 16m;
+
+    # The converter proxy. The browser calls this same-origin path (it is what
+    # VITE_CANOPY_BASE_URL points at) and nginx attaches the API key, so the key
+    # stays server-side instead of being inlined into the JS bundle. Mirrors how
+    # apps/trace reaches canopy-api in the swapps-deployment repo.
+    location ${BASE_PATH}canopy/ {
+        # Resolve the upstream per request instead of once at startup. A literal
+        # hostname in proxy_pass is resolved during config load, which makes
+        # nginx exit if Canopy's Service DNS isn't answering yet — the static app
+        # would then be down purely because the backend lagged. Going through a
+        # variable defers resolution to request time, so the app still serves and
+        # only conversions fail (502) while Canopy is unreachable.
+        resolver ${NGINX_LOCAL_RESOLVERS} valid=30s ipv6=off;
+        set $canopy_upstream "${CANOPY_UPSTREAM}";
+
+        # Strip the proxy prefix explicitly. A variable in proxy_pass disables
+        # nginx's usual "replace the matched location prefix with the proxy_pass
+        # URI" rewriting, so without this the upstream receives `/` and every
+        # conversion 404s. `break` keeps the rewritten URI for proxy_pass, and
+        # proxy_pass therefore carries no URI part of its own.
+        rewrite ^${BASE_PATH}canopy/(.*)$ /$1 break;
+        proxy_pass $canopy_upstream;
+
+        proxy_set_header X-API-Key ${CANOPY_API_KEY};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Conversions parse a whole screen server-side; the default 60s read
+        # timeout is tight for large .edl files.
+        proxy_connect_timeout 10s;
+        proxy_send_timeout    300s;
+        proxy_read_timeout    300s;
+    }
+
+    # Liveness/readiness target. Kept outside ${BASE_PATH} so the kubelet can
+    # probe it without depending on the sub-path the ingress routes.
+    location = /healthz {
+        access_log off;
+        add_header Content-Type text/plain;
+        return 200 "ok\n";
+    }
+
+    # Hashed build assets are immutable; index.html must not be cached or
+    # browsers keep requesting the previous deploy's asset URLs.
+    location ${BASE_PATH}assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        try_files $uri =404;
+    }
+
+    # SPA fallback. The builder has no client-side router today, but an unknown
+    # sub-path should still land on the app rather than a 404.
+    location ${BASE_PATH} {
+        try_files $uri $uri/ ${BASE_PATH}index.html;
+        add_header Cache-Control "no-cache";
+    }
+}
