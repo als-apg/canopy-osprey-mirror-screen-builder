@@ -1,5 +1,5 @@
-# Build stage. pnpm workspace: the app at the root plus packages/screen-ir,
-# which is consumed as `workspace:*` source (no build step of its own).
+# Build stage. The screen IR is consumed as the published
+# `@slaclab/canopy-screen-ir` package, so there is no workspace package to copy.
 FROM node:24-alpine AS builder
 
 ENV PNPM_HOME="/pnpm"
@@ -9,9 +9,18 @@ RUN corepack enable
 WORKDIR /app
 
 # Copy manifests first so the install layer caches independently of source edits.
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY packages/screen-ir/package.json ./packages/screen-ir/
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+# .npmrc points @slaclab at GitHub Packages and expands NODE_AUTH_TOKEN.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+
+# @slaclab/canopy-screen-ir comes from npm.pkg.github.com, which requires a token
+# even for public packages (unlike GHCR container pulls), so the install cannot be
+# anonymous. Mounted as a BuildKit secret rather than a build arg: an ARG would be
+# readable in `docker history` and `docker inspect`. The secret exists only for
+# this RUN and never lands in a layer.
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    --mount=type=secret,id=node_auth_token \
+    NODE_AUTH_TOKEN="$(cat /run/secrets/node_auth_token)" \
+    pnpm install --frozen-lockfile
 
 COPY . .
 

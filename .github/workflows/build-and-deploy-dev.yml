@@ -15,6 +15,11 @@ jobs:
     # TODO: repin to a commit on swapps-ci-helpers' main once
     # https://github.com/slaclab/swapps-ci-helpers/pull/6 merges. This SHA is
     # that PR's head — the reusable workflow does not exist on main yet.
+    #
+    # NOTE: this build will fail until that PR also gains a `build-secrets`
+    # input. The image needs a token to install @slaclab/canopy-screen-ir from
+    # npm.pkg.github.com, which requires auth even for public packages, and the
+    # reusable workflow currently has no way to pass one to `docker build`.
     uses: slaclab/swapps-ci-helpers/.github/workflows/build-image-and-dispatch.yml@1e64b990ae8d9913dc535a5a43c41a220ba8b29a
     with:
       app: canopy-screen-builder
@@ -27,6 +32,13 @@ jobs:
       # the route means changing it in both repos.
       build-args: |
         BASE_PATH=/screen-builder/
+      # Mounted by the Dockerfile as --mount=type=secret,id=node_auth_token. A
+      # build secret rather than a build arg: an arg stays readable in the
+      # published image's `docker history`.
+      build-secrets: |
+        id=node_auth_token,env=NODE_AUTH_TOKEN
     secrets:
       APP_ID: ${{ secrets.APP_ID }}
       APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
+      # Reading a package in this org needs no PAT; the job's own token suffices.
+      NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
