@@ -12,15 +12,16 @@ jobs:
     permissions:
       contents: read
       packages: write
-    # TODO: repin to a commit on swapps-ci-helpers' main once
-    # https://github.com/slaclab/swapps-ci-helpers/pull/6 merges. This SHA is
-    # that PR's head — the reusable workflow does not exist on main yet.
+    # Pinned to swapps-ci-helpers main (merge of #10, which split the combined
+    # workflow into build-ghcr-image.yml + dispatch-swapps-deployment.yml; the
+    # combined entry point below is still supported).
     #
-    # NOTE: this build will fail until that PR also gains a `build-secrets`
+    # NOTE: this build fails until the reusable workflow gains a `build-secrets`
     # input. The image needs a token to install @slaclab/canopy-screen-ir from
-    # npm.pkg.github.com, which requires auth even for public packages, and the
-    # reusable workflow currently has no way to pass one to `docker build`.
-    uses: slaclab/swapps-ci-helpers/.github/workflows/build-image-and-dispatch.yml@1e64b990ae8d9913dc535a5a43c41a220ba8b29a
+    # npm.pkg.github.com, which requires auth even for public packages, and
+    # neither the combined workflow nor build-ghcr-image.yml can currently pass
+    # a secret to `docker build`.
+    uses: slaclab/swapps-ci-helpers/.github/workflows/build-image-and-dispatch.yml@73e6ba924aac5f822b050bd6bed12b0e45c64034
     with:
       app: canopy-screen-builder
       environment: dev
