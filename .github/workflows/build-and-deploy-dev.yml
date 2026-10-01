@@ -59,7 +59,7 @@ jobs:
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         env:
           # Reading a package in this org needs no PAT; the job's own token
-          # suffices. Exposed as env so the `env=` reference in `secrets` resolves.
+          # suffices. Exposed as env for `secret-envs` below to read.
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           context: .
@@ -79,8 +79,13 @@ jobs:
           # A build secret rather than a build arg: an arg stays readable in the
           # published image's `docker history`; a secret exists only for the RUN
           # that mounts it and never lands in a layer.
-          secrets: |
-            id=node_auth_token,env=NODE_AUTH_TOKEN
+          #
+          # `secret-envs` takes `id=ENV_VAR`, not the docker CLI's
+          # `id=...,env=...` form — the action's `secrets` input would treat that
+          # string as a secret literally named `id`, and the Dockerfile's mount
+          # would find nothing at /run/secrets/node_auth_token.
+          secret-envs: |
+            node_auth_token=NODE_AUTH_TOKEN
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
