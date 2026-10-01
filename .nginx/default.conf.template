@@ -53,7 +53,11 @@ server {
         rewrite ^${BASE_PATH}canopy/(.*)$ /$1 break;
         proxy_pass $canopy_upstream;
 
-        proxy_set_header X-API-Key ${CANOPY_API_KEY};
+        # Quoted so an empty key (the Dockerfile default for a bare `docker run`,
+        # or an unset secret) renders as `""` rather than a missing argument that
+        # makes nginx refuse to start. nginx omits a header whose value is empty,
+        # so the static app still serves and only conversions fail upstream.
+        proxy_set_header X-API-Key "${CANOPY_API_KEY}";
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
