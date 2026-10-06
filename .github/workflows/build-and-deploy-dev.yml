@@ -1,0 +1,106 @@
+name: Build image and deploy dev
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  # The build runs here rather than through swapps-ci-helpers'
+  # build-image-and-dispatch.yml because the image needs a BuildKit secret:
+  # @slaclab/canopy-screen-ir is installed from npm.pkg.github.com, which
+  # requires a token even for public packages, and the shared workflow has no
+  # way to pass one to `docker build`. Only the dispatch step is shared, the
+  # same split slaclab/canopy uses.
+  build:
+    permissions:
+      contents: read
+      packages: write
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.vars.outputs.image_tag }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set deployable image tag
+        id: vars
+        # Matches the `type=sha,prefix=sha-` tag produced by metadata-action
+        # below, and the `sha-<short>` convention the dev overlay in
+        # swapps-deployment is updated with.
+        run: echo "image_tag=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        env:
+          # Reading a package in this org needs no PAT; the job's own token
+          # suffices. Exposed as env for `secret-envs` below to read.
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          context: .
+          file: Dockerfile
+          # Pull requests build without pushing; pushes and manual runs on main
+          # publish and go on to dispatch the deployment.
+          push: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # BASE_PATH is baked into the bundle's asset URLs by Vite and rendered
+          # into the nginx location blocks, so it must match the ingress path in
+          # swapps-deployment (apps/canopy-screen-builder/base/ingress.yaml).
+          # Changing the route means changing it in both repos.
+          build-args: |
+            BASE_PATH=/screen-builder/
+          # Mounted by the Dockerfile as --mount=type=secret,id=node_auth_token.
+          # A build secret rather than a build arg: an arg stays readable in the
+          # published image's `docker history`; a secret exists only for the RUN
+          # that mounts it and never lands in a layer.
+          #
+          # `secret-envs` takes `id=ENV_VAR`, not the docker CLI's
+          # `id=...,env=...` form — the action's `secrets` input would treat that
+          # string as a secret literally named `id`, and the Dockerfile's mount
+          # would find nothing at /run/secrets/node_auth_token.
+          secret-envs: |
+            node_auth_token=NODE_AUTH_TOKEN
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  dispatch-swapps-dev:
+    name: Deploy Kubernetes dev
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    uses: slaclab/swapps-ci-helpers/.github/workflows/dispatch-swapps-deployment.yml@73e6ba924aac5f822b050bd6bed12b0e45c64034 # v1.1.0
+    with:
+      app: canopy-screen-builder
+      environment: dev
+      image: ghcr.io/${{ github.repository }}:${{ needs.build.outputs.image_tag }}
+      deployment-owner: slaclab
+      deployment-repo: swapps-deployment
+      deploy-ref: refs/heads/main
+    secrets:
+      APP_ID: ${{ secrets.APP_ID }}
+      APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}

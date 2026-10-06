@@ -40,12 +40,36 @@ export interface ConvertScreenOptions {
 
 const CONVERSIONS_PATH = '/converter/v1/conversions';
 
+/** `scheme://` prefix test — distinguishes an absolute base from a path-only one. */
+const ABSOLUTE_URL = /^[a-z][a-z0-9+.-]*:\/\//i;
+
+/**
+ * Join `CONVERSIONS_PATH` onto a configured base URL, preserving any path
+ * prefix the base carries.
+ *
+ * `VITE_CANOPY_BASE_URL` takes two shapes. Local development points it at a
+ * whole origin (`http://127.0.0.1:8000`). The deployed build points it at a
+ * same-origin *path* (`/screen-builder/canopy`) that the container's nginx
+ * proxies to the in-cluster Canopy, adding `X-API-Key` server-side so the key
+ * never reaches the browser. Both must keep their prefix, which rules out
+ * `new URL(CONVERSIONS_PATH, base)` — an absolute-path argument discards the
+ * base's own path.
+ */
+function conversionsUrl(base: string): string {
+  const trimmed = base.replace(/\/+$/, '');
+  if (ABSOLUTE_URL.test(trimmed)) return trimmed + CONVERSIONS_PATH;
+  // Path-only base: resolve against the page's origin so `fetch` gets an
+  // absolute URL and the error paths below can report where the request went.
+  return new URL(trimmed + CONVERSIONS_PATH, window.location.origin).toString();
+}
+
 /**
  * Convert one legacy screen file to a screen IR document via Canopy.
  *
- * Reads the backend base URL from `VITE_CANOPY_BASE_URL`. Throws
- * `ConverterError` on a missing base URL or any non-2xx response (the
- * `CanopyError` envelope's message is surfaced).
+ * Reads the backend base URL from `VITE_CANOPY_BASE_URL`, which may be a bare
+ * origin or a same-origin path prefix. Throws `ConverterError` on a missing
+ * base URL or any non-2xx response (the `CanopyError` envelope's message is
+ * surfaced).
  */
 export async function convertScreen(
   file: File,
@@ -66,14 +90,17 @@ export async function convertScreen(
 
   // The converter route is guarded by `require_read_access` (X-API-Key). Send
   // the key when configured; absent, the server returns a 401 we surface.
+  // Deployed builds leave this unset on purpose: the container's nginx adds the
+  // header from a Kubernetes secret, keeping the key out of the JS bundle.
   const headers: Record<string, string> = {};
   const apiKey = import.meta.env.VITE_CANOPY_API_KEY;
   if (apiKey) headers['X-API-Key'] = apiKey;
 
+  const url = conversionsUrl(base);
   let res: Response;
   try {
     // Do NOT set Content-Type — the browser sets the multipart boundary.
-    res = await fetch(new URL(CONVERSIONS_PATH, base), {
+    res = await fetch(url, {
       method: 'POST',
       body: form,
       headers,

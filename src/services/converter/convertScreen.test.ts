@@ -101,6 +101,41 @@ describe('convertScreen', () => {
     });
   });
 
+  // The deployed build sets the base URL to a same-origin path that nginx
+  // proxies (adding X-API-Key server-side), so the prefix must survive.
+  it('preserves a path-only base URL, resolved against the page origin', async () => {
+    vi.stubEnv('VITE_CANOPY_BASE_URL', '/screen-builder/canopy');
+    const fetchMock = vi.fn(async (url: URL | string) => {
+      expect(String(url)).toBe(
+        `${window.location.origin}/screen-builder/canopy/converter/v1/conversions`
+      );
+      return new Response(JSON.stringify(DTO), { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    await convertScreen(file());
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it('preserves a path prefix on an absolute base URL', async () => {
+    vi.stubEnv('VITE_CANOPY_BASE_URL', 'https://example.test/canopy');
+    const fetchMock = vi.fn(async (url: URL | string) => {
+      expect(String(url)).toBe('https://example.test/canopy/converter/v1/conversions');
+      return new Response(JSON.stringify(DTO), { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    await convertScreen(file());
+  });
+
+  it('tolerates a trailing slash on the base URL', async () => {
+    vi.stubEnv('VITE_CANOPY_BASE_URL', 'http://localhost:8000/');
+    const fetchMock = vi.fn(async (url: URL | string) => {
+      expect(String(url)).toBe('http://localhost:8000/converter/v1/conversions');
+      return new Response(JSON.stringify(DTO), { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    await convertScreen(file());
+  });
+
   it('throws NoBaseUrl when the env var is unset', async () => {
     vi.stubEnv('VITE_CANOPY_BASE_URL', '');
     await expect(convertScreen(file())).rejects.toMatchObject({

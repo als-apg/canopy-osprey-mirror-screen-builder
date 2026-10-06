@@ -48,6 +48,10 @@ function SortableTab({
     // Disable drag while renaming so pointerdown on the input doesn't start a
     // drag — the input needs full pointer control for text selection.
     disabled: isRenaming,
+    // dnd-kit's attributes default to role="button"; a tab that also carries
+    // aria-selected must be role="tab". Set it here rather than on the element
+    // so the spread below doesn't overwrite it.
+    attributes: { role: 'tab' },
   });
 
   const style: React.CSSProperties = {
@@ -65,7 +69,6 @@ function SortableTab({
     <div
       ref={setNodeRef}
       style={style}
-      role="tab"
       aria-selected={isActive}
       className={`tab-bar__tab ${isActive ? 'tab-bar__tab--active' : ''} ${tab.isDirty ? 'tab-bar__tab--dirty' : ''} ${isDragging ? 'tab-bar__tab--dragging' : ''}`}
       onClick={onActivate}

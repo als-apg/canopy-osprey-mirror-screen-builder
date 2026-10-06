@@ -4,6 +4,11 @@ import react from '@vitejs/plugin-react';
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  // Asset URLs are rewritten for the deployment's sub-path. The dev deployment
+  // is served from `/screen-builder` behind an nginx ingress, so the default
+  // `/` base would emit `/assets/...` links that 404. Overridden at image build
+  // time via `--build-arg BASE_PATH`; stays `/` for `pnpm dev`.
+  base: process.env.BASE_PATH ?? '/',
   test: {
     passWithNoTests: true,
     environment: 'jsdom',
