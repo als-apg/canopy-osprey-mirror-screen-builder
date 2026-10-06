@@ -132,11 +132,11 @@ docker run --rm -p 8080:8080 \
 
 Runtime environment variables:
 
-| Variable          | Default                  | Description                                                                 |
-| ----------------- | ------------------------ | --------------------------------------------------------------------------- |
-| `BASE_PATH`       | `/screen-builder/`       | URL prefix, with trailing slash. Must match the value built into the image. |
-| `CANOPY_UPSTREAM` | `http://canopy-api:8000` | Canopy base URL, no trailing slash.                                         |
-| `CANOPY_API_KEY`  | (empty)                  | Canopy read key that nginx attaches to converter requests.                  |
+| Variable          | Default                  | Description                                                                                                                                                                                    |
+| ----------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BASE_PATH`       | `/screen-builder/`       | URL prefix, with trailing slash. Must match the value built into the image.                                                                                                                    |
+| `CANOPY_UPSTREAM` | `http://canopy-api:8000` | Canopy base URL, no trailing slash. In Kubernetes use the fully qualified Service name (`canopy-api.<ns>.svc.cluster.local`); nginx's `resolver` ignores search domains, so a short name 502s. |
+| `CANOPY_API_KEY`  | (empty)                  | Canopy read key that nginx attaches to converter requests.                                                                                                                                     |
 
 The app serves even when Canopy is unreachable — nginx resolves the upstream per
 request, so conversions return 502 while static content keeps working, rather

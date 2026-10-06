@@ -6,7 +6,11 @@
 #
 # Substituted vars (see Dockerfile ENV defaults and the Kubernetes Deployment):
 #   BASE_PATH       URL prefix the app is served under, with trailing slash.
-#   CANOPY_UPSTREAM in-cluster Canopy base URL, no trailing slash.
+#   CANOPY_UPSTREAM in-cluster Canopy base URL, no trailing slash. Must be a
+#                   fully qualified hostname (canopy-api.<ns>.svc.cluster.local):
+#                   the `resolver` directive below queries DNS directly and does
+#                   not apply /etc/resolv.conf search domains, so a bare Service
+#                   name fails with "Host not found" and every conversion 502s.
 #   CANOPY_API_KEY  Canopy read key, injected from a Kubernetes secret.
 #   NGINX_LOCAL_RESOLVERS  set by the base image's 15-local-resolvers.envsh
 #                          from /etc/resolv.conf (the cluster DNS in k8s).
