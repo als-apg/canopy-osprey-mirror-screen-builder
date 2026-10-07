@@ -60,8 +60,10 @@ ENV NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1
 ARG BASE_PATH=/screen-builder/
 ENV BASE_PATH=$BASE_PATH
 
-# Overridden by the Deployment to the in-cluster service; this default only
-# makes a bare `docker run` serve the static app without a working converter.
+# Overridden by the Deployment to the in-cluster service's *fully qualified*
+# name (nginx's resolver ignores search domains, so a short name never resolves);
+# this default only makes a bare `docker run` serve the static app without a
+# working converter.
 ENV CANOPY_UPSTREAM=http://canopy-api:8000
 ENV CANOPY_API_KEY=""
 

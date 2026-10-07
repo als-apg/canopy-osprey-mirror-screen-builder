@@ -1,5 +1,8 @@
 @use '@carbon/react' with (
-  $use-flexbox-grid: true
+  $use-flexbox-grid: true,
+  // Carbon's default '~@ibm/plex' is a webpack alias Vite can't resolve.
+  $font-path: '@ibm/plex',
+  $use-per-family-plex: true
 );
 
 // Alarm severity tokens
